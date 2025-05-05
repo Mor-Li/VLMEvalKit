@@ -239,6 +239,12 @@ api_models = {
     "GeminiFlash1-5-002": partial(
         GPT4V, model="gemini-1.5-flash-002", temperature=0, retry=10
     ),  # Internal Use Only
+    "GeminiFlash2-thinking": partial(
+        GPT4V, model="gemini-2.0-flash-thinking", temperature=0, retry=10
+    ),  # Internal Use Only
+    "GeminiFlash2": partial(
+        GPT4V, model="gemini-2.0-flash", temperature=0, retry=10
+    ),  # Internal Use Only
     "GeminiFlash2-0": partial(
         Gemini, model="gemini-2.0-flash", temperature=0, retry=10
     ),

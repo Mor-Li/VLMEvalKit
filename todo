@@ -1,0 +1,2 @@
+1. Qwen2.5-VL-32B-Instruct 的torchrun有size的bug
+2. openai 的接口就不应该用request 太不稳定了

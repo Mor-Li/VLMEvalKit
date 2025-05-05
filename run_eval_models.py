@@ -5,9 +5,8 @@ import sys
 import subprocess
 import time
 import pandas as pd
-
-# 是否只测试配置而不提交任务 (1=测试模式, 0=实际提交)
-TEST_MODE = 1
+import argparse
+import random
 
 # 项目根目录
 PROJECT_DIR = "/fs-computility/mllm1/limo/workspace/VLMEvalKit"
@@ -15,20 +14,27 @@ PROJECT_DIR = "/fs-computility/mllm1/limo/workspace/VLMEvalKit"
 # 要评测的数据集
 DATASET = "MSR_Bench"
 
+# 解析命令行参数
+def parse_args():
+    parser = argparse.ArgumentParser(description='运行评测任务')
+    parser.add_argument('--debug', action='store_true', help='测试模式：仅检查配置，不提交任务')
+    parser.add_argument('--queue', type=str, default='both', help='指定队列名称: mllm1, llmeval_volc 或 both（随机选择）')
+    return parser.parse_args()
+
 # 基础命令模板
 CMD_TEMPLATE = (
-    f"cd {PROJECT_DIR} && conda activate ENV_NAME && python run.py --data {DATASET} --model MODEL_NAME --verbose --reuse"
+    f"cd {PROJECT_DIR} && conda activate ENV_NAME && python run.py --data {DATASET} --model MODEL_NAME --verbose"
 )
-
-
 
 api_models = [
     "GPT4o_20240806",
     "gpt-4.1-2025-04-14",
+    "GPT4.5"
     "Claude3-7V_Sonnet_Internal",
-    # "GeminiPro2-5",
-    # "GeminiFlash2-0",
-    # "DoubaoVL",
+    "GeminiPro2-5",
+    "GeminiFlash2-thinking",
+    "GeminiFlash2",
+    "DoubaoVL",
 ]
     
     
@@ -77,13 +83,11 @@ MODELS = [
     "deepseek_vl2_tiny",
     "deepseek_vl2_small",
     "deepseek_vl2",
-    
-    
- 
        
     # API models
     *api_models,
 ]
+# MODELS = [ "Qwen2.5-VL-32B-Instruct"]
 
 print(f"python scripts/summarize.py --model {' '.join(MODELS)} --data {DATASET}")
 # python scripts/summarize.py --model InternVL2_5-1B InternVL2_5-2B InternVL2_5-4B InternVL2_5-8B InternVL2_5-26B InternVL2_5-38B InternVL2_5-78B InternVL3-1B InternVL3-2B InternVL3-8B InternVL3-9B InternVL3-14B InternVL3-38B InternVL3-78B Qwen2.5-VL-3B-Instruct Qwen2.5-VL-7B-Instruct Qwen2.5-VL-32B-Instruct Qwen2.5-VL-72B-Instruct llava_onevision_qwen2_0.5b_ov llava_onevision_qwen2_7b_ov llava_onevision_qwen2_72b_ov Llama-3.2-11B-Vision-Instruct deepseek_vl2_tiny deepseek_vl2_small deepseek_vl2 GPT4o_20240806 gpt-4.1-2025-04-14 Claude3-7V_Sonnet_Internal GeminiPro2-5 GeminiFlash2-0 DoubaoVL --data MSR_Bench
@@ -178,6 +182,7 @@ def collect_model_info():
     for model in MODELS:
         env = get_env(model)
         gpu_count = get_gpu_count(model)
+        gpu_count = 8
         env_exists = "✓" if check_env_exists(env, all_envs) else "✗"
         rows.append({
             "模型名称": model,
@@ -216,13 +221,27 @@ def py_volcrun(task_cmd, num_gpus=8, queue_name="mllm1", task_name="paramnoise_t
     return subprocess.run(args, check=True)
 
 def main():
+    # 解析命令行参数
+    args = parse_args()
+    
     df = collect_model_info()
     print_model_table(df)
 
-    if TEST_MODE == 1:
+    if args.debug:
         print("测试模式：配置检查完成，未提交任务。")
-        print("将TEST_MODE设置为0以实际提交任务。")
+        print("不使用--debug参数以实际提交任务。")
         sys.exit(0)
+
+    # 准备队列列表
+    available_queues = ["mllm1", "llmeval_volc"]
+    if args.queue == 'both':
+        queue_list = available_queues
+    else:
+        if args.queue in available_queues:
+            queue_list = [args.queue]
+        else:
+            print(f"警告: 未知队列 {args.queue}，使用默认队列 mllm1")
+            queue_list = ["mllm1"]
 
     print("开始提交任务...")
     for idx, row in df.iterrows():
@@ -237,12 +256,9 @@ def main():
         print(f"提交任务: {model} (环境: {env}, GPU: {gpu_count})")
         # 直接用python版本的volcrun
         try:
-            import random
             random.seed(idx)
-            queue_name = random.choice([
-                "mllm1", 
-                "llmeval_volc"
-                ])
+            queue_name = random.choice(queue_list)
+            print(f"使用队列: {queue_name}")
             # 替换点号为下划线，确保符合任务名称规范
             sanitized_model_name = model.replace(".", "_")
             py_volcrun(cmd, num_gpus=gpu_count, queue_name=queue_name, task_name=f"eval_{sanitized_model_name}")

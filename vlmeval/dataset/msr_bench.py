@@ -16,11 +16,12 @@ class MSRBenchDataset(ImageMCQDataset):
     TYPE = 'MCQ'
     
     # 使用本地TSV文件路径，不进行网络下载
-    MSR_BENCH_TSV = '/fs-computility/mllm1/shared/LMUData/msr_bench_cat_option_to_qs.tsv'
+    MSR_BENCH_TSV = '/fs-computility/mllm1/shared/LMUData/msr_bench_fanal_version_5_5_cat_option_to_qs.tsv'
+    # MSR_BENCH_TSV = '/fs-computility/mllm1/shared/LMUData/msr_bench_en_3_sample_from_fanal_version_cat_option_to_qs.tsv'
     
-    DATASET_URL = {
-        'MSR_Bench': 'file:///fs-computility/mllm1/shared/LMUData/msr_bench_cat_option_to_qs.tsv'
-    }
+    # DATASET_URL = {
+    #     'MSR_Bench': 'file:///fs-computility/mllm1/shared/LMUData/msr_bench_cat_option_to_qs.tsv'
+    # }
     DATASET_MD5 = {
         'MSR_Bench': ''  # 如果有MD5校验，可以在这里添加
     }

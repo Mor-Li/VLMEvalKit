@@ -336,6 +336,14 @@ api_models = {
         retry=10,
         verbose=False,
     ),
+    "Claude3-7V_Sonnet_Internal": partial(
+        GPT4V,
+        model="claude-3-7-sonnet-20250219",
+        temperature=0,
+        retry=10,
+        verbose=False,
+    ),
+
     # GLM4V
     "GLM4V": partial(GLMVisionAPI, model="glm4v-biz-eval", temperature=0, retry=10),
     "GLM4V_PLUS": partial(GLMVisionAPI, model="glm-4v-plus", temperature=0, retry=10),
@@ -577,7 +585,7 @@ llava_series = {
         LLaVA_Next, model_path="llava-hf/llava-interleave-qwen-7b-dpo-hf"
     ),
     "llava-onevision-qwen2-0.5b-ov-hf": partial(
-        LLaVA_OneVision_HF, model_path="llava-hf/llava-onevision-qwen2-0.5b-ov-hf"
+        LLaVA_OneVision_HF, model_path="/fs-computility/mllm1/limo/workspace/opencompass/models/models--lmms-lab--llava-onevision-qwen2-0.5b-ov"
     ),
     "llava-onevision-qwen2-0.5b-si-hf": partial(
         LLaVA_OneVision_HF, model_path="llava-hf/llava-onevision-qwen2-0.5b-si-hf"
@@ -779,7 +787,7 @@ internvl3 = {
         InternVLChat, model_path="OpenGVLab/InternVL3-8B", version="V2.0", use_lmdeploy=True
     ),
     "InternVL3-9B": partial(
-        InternVLChat, model_path="OpenGVLab/InternVL3-9B", version="V2.0"
+        InternVLChat, model_path="/fs-computility/mllm1/limo/workspace/VLMEvalKit/images/models/models--open-gv-lab--internvl3-9b", version="V2.0"
     ),
     "InternVL3-14B": partial(
         InternVLChat, model_path="OpenGVLab/InternVL3-14B", version="V2.0"
@@ -872,7 +880,7 @@ deepseekvl_series = {
 
 deepseekvl2_series = {
     "deepseek_vl2_tiny": partial(
-        DeepSeekVL2, model_path="deepseek-ai/deepseek-vl2-tiny"
+        DeepSeekVL2, model_path="/fs-computility/mllm1/limo/workspace/VLMEvalKit/images/models/models--deepseek-ai--deepseek-vl2-tiny"
     ),
     "deepseek_vl2_small": partial(
         DeepSeekVL2, model_path="deepseek-ai/deepseek-vl2-small"
@@ -923,6 +931,8 @@ vila_series = {
     ),
     "VILA1.5-13b": partial(VILA, model_path="Efficient-Large-Model/VILA1.5-13b"),
     "VILA1.5-40b": partial(VILA, model_path="Efficient-Large-Model/VILA1.5-40b"),
+    "NVILA-8B": partial(VILA, model_path="/fs-computility/mllm1/limo/workspace/VLMEvalKit/images/models/models--efficient-large-model--NVILA-8B"),
+    "NVILA-15B": partial(VILA, model_path="/fs-computility/mllm1/limo/workspace/VLMEvalKit/images/models/models--efficient-large-model--NVILA-15B"),
 }
 
 ovis_series = {

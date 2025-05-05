@@ -1,9 +1,13 @@
 from vlmeval.smp import *
 from vlmeval.dataset import SUPPORTED_DATASETS
 
-def get_score(model, dataset):
+# 存储数据集各个类别的样本数
+category_counts = {}
 
-    file_name = f'{model}/{model}_{dataset}'
+def get_score(model, dataset):
+    global category_counts
+    
+    file_name = f'outputs/{model}/{model}_{dataset}'
     if listinstr([
         'CCBench', 'MMBench', 'SEEDBench_IMG', 'MMMU', 'ScienceQA', 
         'AI2D_TEST', 'MMStar', 'RealWorldQA', 'BLINK', 'VisOnlyQA-VLMEvalKit'
@@ -16,10 +20,13 @@ def get_score(model, dataset):
     elif listinstr(['COCO', 'OCRBench'], dataset):
         file_name += '_score.json'
     elif listinstr(['Spatial457'], dataset):
-            file_name += '_score.json'
+        file_name += '_score.json'
+    elif listinstr(['MSR_Bench'], dataset):
+        file_name += '_score.xlsx'
     else:
         raise NotImplementedError
     if not osp.exists(file_name):
+        print(f"文件未找到: {file_name}")
         return {}
     
     data = load(file_name)
@@ -68,6 +75,23 @@ def get_score(model, dataset):
         for level in ["L1_single", "L2_objects", "L3_2d_spatial", "L4_occ",
                         "L4_pose", "L5_6d_spatial", "L5_collision"]:
             ret[f"{dataset} - {level}"] = data[f"{level}_score"] * 100
+    elif dataset == 'MSR_Bench':
+        # Calculate overall accuracy from the score column (0 or 1 for each question)
+        if 'score' in data.columns:
+            # Overall accuracy is the mean of all scores
+            overall_acc = data['score'].mean() * 100
+            ret[dataset] = overall_acc
+            
+            # 计算每个类别的样本数量
+            if 'category' in data.columns and dataset not in category_counts:
+                category_counts[dataset] = data['category'].value_counts().to_dict()
+            
+            # Calculate category-wise accuracies
+            if 'category' in data.columns:
+                category_results = data.groupby('category')['score'].mean() * 100
+                for cat, score in category_results.items():
+                    if not pd.isna(cat) and cat != 'nan':
+                        ret[f'MSR_Bench - {cat}'] = score
     return ret
 
 def parse_args():
@@ -101,6 +125,22 @@ def gen_table(models, datasets):
             else:
                 final[k].append(None)
     final = pd.DataFrame(final)
+    
+    # 显示类别样本数量信息
+    if category_counts:
+        print("=== 数据集类别样本统计 ===")
+        for dataset, counts in category_counts.items():
+            print(f"\n{dataset} 总样本数: {sum(counts.values())}")
+            category_info = []
+            for cat, count in sorted(counts.items()):
+                if not pd.isna(cat) and cat != 'nan':
+                    category_info.append(f"{cat}: {count}题")
+            
+            # 每行打印3个类别信息
+            for i in range(0, len(category_info), 3):
+                print("  ".join(category_info[i:i+3]))
+        print("\n=== 模型性能对比 ===")
+    
     dump(final, 'summ.csv')
     if len(final) >= len(final.iloc[0].keys()):
         print(tabulate(final))

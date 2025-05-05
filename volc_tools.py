@@ -80,7 +80,7 @@ class VolcanoDeployment:
     def choose_flavor(self, num_gpus: int, num_replicas: int = 1) -> Dict:
         """根据GPU需求选择合适的机器类型。"""
         flavor_map = {  # 机器类型映射
-            0: 'ml.c1ie.2xlarge',
+            0: 'ml.r3i.large',
             1: 'ml.pni2l.3xlarge',
             2: 'ml.pni2l.7xlarge',
             4: 'ml.pni2l.14xlarge',

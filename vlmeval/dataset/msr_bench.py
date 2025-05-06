@@ -18,7 +18,8 @@ class MSRBenchDataset(ImageMCQDataset):
     TYPE = 'MCQ'
     
     # 使用本地TSV文件路径，不进行网络下载
-    MSR_BENCH_TSV = '/fs-computility/mllm1/shared/LMUData/msr_bench_fanal_version_5_5_cat_option_to_qs.tsv'
+    # MSR_BENCH_TSV = '/fs-computility/mllm1/shared/LMUData/msr_bench_fanal_version_5_5_cat_option_to_qs.tsv'
+    MSR_BENCH_TSV = '/fs-computility/mllm1/shared/LMUData/msr_bench_fanal_version_5_5_cat_option_to_qs_fixed.tsv'
     # MSR_BENCH_TSV = '/fs-computility/mllm1/shared/LMUData/msr_bench_en_3_sample_from_fanal_version_cat_option_to_qs.tsv'
     
     # DATASET_URL = {
@@ -226,7 +227,7 @@ class MSRBenchDataset(ImageMCQDataset):
         return pd.DataFrame([results])
     
     @staticmethod
-    def extract_single_choice_with_word_boundary(pred, gt):
+    def extract_single_choice_with_word_boundary(pred):
         """
         从预测文本中提取选项，并与正确答案比较。
         返回提取到的选项，如果没有找到则返回None。
@@ -353,73 +354,97 @@ class MSRBenchCircular(MSRBenchDataset):
     
     def evaluate(self, eval_file, **judge_kwargs):
         """
-        使用circular evaluation方法评估模型预测结果。
+        简单直接的circular evaluation方法
+        直接提取预测的字母，然后检查每组题目是否都预测正确
         """
-        from .utils.multiple_choice import mcq_circular_eval, report_acc
+        from ..smp.file import load, dump
+        from .utils.multiple_choice import report_acc
+        import pandas as pd
+        import numpy as np
         
-        nproc = judge_kwargs.pop('nproc', 4)
         suffix = eval_file.split('.')[-1]
-        
-        # 处理模型设置
-        model = judge_kwargs.get('model', 'exact_matching')
-        assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125']
-        name_str_map = {'chatgpt-0125': 'openai', 'gpt-4-0125': 'gpt4'}
-        name_str = name_str_map[model] if model in name_str_map else model
-        
-        if model == 'exact_matching':
-            model = None
-        elif gpt_key_set():
-            model = build_judge(**judge_kwargs)
-            if not model.working():
-                warnings.warn('OPENAI API is not working properly, will use exact matching for evaluation')
-                warnings.warn(DEBUG_MESSAGE)
-                model = None
-        else:
-            warnings.warn('OPENAI_API_KEY is not set properly, will use exact matching for evaluation')
-            model = None
-        
-        # 结果文件路径
-        result_file = eval_file.replace(f'.{suffix}', f'_{name_str}_result.pkl')
         
         # 加载和预处理评估数据
         data = load(eval_file)
         data = data.sort_values(by='index')
-        data['index'] = [int(x) for x in data['index']]  # 确保index是整数
+        data['index'] = [int(x) for x in data['index']]
         data['prediction'] = [str(x) for x in data['prediction']]
         
-        # 统一列名大小写
-        for k in data.keys():
-            data[k.lower() if k not in list(string.ascii_uppercase) else k] = data.pop(k)
-        
-        # 确保数据中有g_index字段，用于circular评估
+        # 确保数据中有g_index字段
         if 'g_index' not in data.columns:
-            data['g_index'] = data['index']
+            data['g_index'] = [int(x % 1e6) for x in data['index']]
+            
+        # 使用已有的extract_single_choice_with_word_boundary函数提取选项
+        data['extracted_pred'] = data['prediction'].apply(self.extract_single_choice_with_word_boundary)
         
-        # 确保评估数据与训练数据匹配
-        meta = self.data
-        meta_q_map = {x: y for x, y in zip(meta['index'], meta['question'])}
-        data_map = {x: y for x, y in zip(data['index'], data['question'])}
-        for k in data_map:
-            assert k in meta_q_map, (
-                f'eval_file should be the same as or a subset of dataset {self.dataset_name}'
-            )
+        # 分组评估
+        groups = data.groupby('g_index')
+        results = []
         
-        # 明确标记这是一个circular evaluation
-        data['circular'] = True
-        meta['circular'] = True
+        for g_index, group in groups:
+            # 创建基本结果行
+            result_row = {
+                'index': int(g_index),  # 使用g_index作为主index
+                'category': group['category'].iloc[0],
+                'hit': 0,
+                'log': ''
+            }
+            
+            # 检查是否所有预测都正确
+            all_correct = True
+            log_parts = []
+            
+            for _, row in group.iterrows():
+                pred = row['extracted_pred']
+                ans = row['answer']
+                
+                # 记录当前行预测结果
+                correct = (pred == ans)
+                log_parts.append(f"Index {row['index']}: 预测={pred}, 答案={ans}, 正确={correct}")
+                
+                if not correct:
+                    all_correct = False
+            
+            # 如果所有预测都正确，则这题算对
+            result_row['hit'] = 1 if all_correct else 0
+            result_row['log'] = '\n'.join(log_parts)
+            
+            results.append(result_row)
+            
+        # 创建结果DataFrame
+        result_df = pd.DataFrame(results)
         
-        # 使用circular评估方法
-        data = mcq_circular_eval(model, data, meta, nproc, result_file, self.dataset_name)
-        
-        # 保存评估结果
-        dump(data, eval_file.replace(f'.{suffix}', f'_{name_str}_result.{suffix}'))
-        data = load(eval_file.replace(f'.{suffix}', f'_{name_str}_result.{suffix}'))
+        # 保存详细结果
+        name_str = 'simple'
+        detailed_file = eval_file.replace(f'.{suffix}', f'_{name_str}_result.{suffix}')
+        dump(result_df, detailed_file)
         
         # 计算准确率
-        acc = report_acc(data)
+        acc = {}
+        acc['Overall'] = np.mean(result_df['hit'])
+        
+        # 按类别计算准确率
+        if 'category' in result_df.columns:
+            categories = result_df['category'].unique()
+            for category in categories:
+                cat_data = result_df[result_df['category'] == category]
+                acc[category] = np.mean(cat_data['hit'])
+                
+        # 创建简单的报告格式
+        acc_df = pd.DataFrame([acc])
         
         # 保存准确率结果
-        score_file = eval_file.replace(f'.{suffix}', '_acc.csv')
-        dump(acc, score_file)
+        score_file = eval_file.replace(f'.{suffix}', f'_{name_str}_acc.csv')
+        dump(acc_df, score_file)
         
-        return acc 
+        print(f"MSR_Bench Circular 评测结果：")
+        print(f"总样本数: {len(result_df)}")
+        print(f"正确样本数: {sum(result_df['hit'])}")
+        print(f"准确率: {acc['Overall']:.2%}")
+        
+        # 输出每个类别的准确率
+        for cat in categories:
+            cat_acc = acc[cat]
+            print(f"{cat}: {cat_acc:.2%}")
+            
+        return acc_df 

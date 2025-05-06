@@ -4,8 +4,10 @@ import pandas as pd
 import os.path as osp
 import json
 import numpy as np
+import warnings
 from .image_mcq import ImageMCQDataset
-from ..smp import LMUDataRoot, file_size, load, decode_base64_to_image_file
+from .utils import DEBUG_MESSAGE, build_judge
+from ..smp import LMUDataRoot, file_size, load, dump, decode_base64_to_image_file, listinstr, gpt_key_set
 import string
 
 class MSRBenchDataset(ImageMCQDataset):
@@ -257,3 +259,160 @@ class MSRBenchDataset(ImageMCQDataset):
             return None  # 如果没有匹配，返回 None
             
         return pred 
+
+
+class MSRBenchCircular(MSRBenchDataset):
+    """
+    MSR Bench Circular Dataset class.
+    Uses circular evaluation method for multiple-choice questions.
+    选项嵌入在question字段中，使用circular evaluation方法进行评估。
+    """
+    TYPE = 'MCQ'
+    
+    @classmethod
+    def supported_datasets(cls):
+        return ['MSR_Bench_Circular']
+    
+    def extract_options_from_question(self, question):
+        """
+        从问题文本中提取选项。
+        格式：问题文本 + "Options:" + "A: 选项1, B: 选项2, ..."
+        """
+        # 检查是否有"Options:"部分
+        parts = question.split("Options:", 1)
+        if len(parts) < 2:
+            # 如果没有找到"Options:"，返回原始问题文本和空选项
+            return parts[0].strip(), {}
+        
+        # 提取问题和选项部分
+        question_text = parts[0].strip()
+        options_text = parts[1].strip()
+        
+        # 提取选项
+        options = {}
+        # 使用正则表达式提取选项
+        pattern = r'([A-D])\s*:\s*([^,]*?)(?:,\s*[A-D]\s*:|$)'
+        matches = re.findall(pattern, options_text)
+        
+        for key, value in matches:
+            options[key] = value.strip()
+        
+        return question_text, options
+    
+    def build_prompt(self, line):
+        """
+        构建提示，支持多图片输入，并从question中提取选项。
+        """
+        if isinstance(line, int):
+            line = self.data.iloc[line]
+            
+        # 处理图片（支持多图）
+        tgt_path = self.dump_image(line)
+        
+        # 从question中提取选项
+        question_text, options = self.extract_options_from_question(line['question'])
+        
+        # 构建标准MCQ格式的提示
+        prompt = ''
+        prompt += f'Question: {question_text}\n'
+        
+        if options:
+            options_prompt = 'Options:\n'
+            for key, item in options.items():
+                options_prompt += f'{key}. {item}\n'
+            prompt += options_prompt
+            prompt += 'Please select the correct answer from the options above.\n'
+        
+        # 构建多模态消息
+        msgs = []
+        if isinstance(tgt_path, list):
+            # 处理多张图片
+            msgs.extend([dict(type='image', value=p) for p in tgt_path])
+        else:
+            # 处理单张图片
+            msgs = [dict(type='image', value=tgt_path)]
+        
+        # 添加文本提示
+        msgs.append(dict(type='text', value=prompt))
+        return msgs
+    
+    def preprocess_data(self):
+        """
+        预处理数据：从question中提取选项，并添加到数据中的A、B、C、D列
+        """
+        for idx, row in self.data.iterrows():
+            question_text, options = self.extract_options_from_question(row['question'])
+            # 更新数据中的选项列
+            for key, value in options.items():
+                self.data.at[idx, key] = value
+    
+    def post_build(self, dataset):
+        """
+        在加载完数据后，进行数据预处理
+        """
+        self.preprocess_data()
+    
+    def evaluate(self, eval_file, **judge_kwargs):
+        """
+        使用circular evaluation方法评估模型预测结果。
+        """
+        from .utils.multiple_choice import mcq_circular_eval, report_acc
+        
+        nproc = judge_kwargs.pop('nproc', 4)
+        suffix = eval_file.split('.')[-1]
+        
+        # 处理模型设置
+        model = judge_kwargs.get('model', 'exact_matching')
+        assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125']
+        name_str_map = {'chatgpt-0125': 'openai', 'gpt-4-0125': 'gpt4'}
+        name_str = name_str_map[model] if model in name_str_map else model
+        
+        if model == 'exact_matching':
+            model = None
+        elif gpt_key_set():
+            model = build_judge(**judge_kwargs)
+            if not model.working():
+                warnings.warn('OPENAI API is not working properly, will use exact matching for evaluation')
+                warnings.warn(DEBUG_MESSAGE)
+                model = None
+        else:
+            warnings.warn('OPENAI_API_KEY is not set properly, will use exact matching for evaluation')
+            model = None
+        
+        # 结果文件路径
+        result_file = eval_file.replace(f'.{suffix}', f'_{name_str}_result.pkl')
+        
+        # 加载和预处理评估数据
+        data = load(eval_file)
+        data = data.sort_values(by='index')
+        data['index'] = [int(x) for x in data['index']]  # 确保index是整数
+        data['prediction'] = [str(x) for x in data['prediction']]
+        
+        # 统一列名大小写
+        for k in data.keys():
+            data[k.lower() if k not in list(string.ascii_uppercase) else k] = data.pop(k)
+        
+        # 确保评估数据与训练数据匹配
+        meta = self.data
+        meta_q_map = {x: y for x, y in zip(meta['index'], meta['question'])}
+        data_map = {x: y for x, y in zip(data['index'], data['question'])}
+        for k in data_map:
+            assert k in meta_q_map, (
+                f'eval_file should be the same as or a subset of dataset {self.dataset_name}'
+            )
+        
+        # 使用circular评估方法
+        data = mcq_circular_eval(model, data, meta, nproc, result_file, self.dataset_name)
+        
+        # 保存评估结果
+        dump(data, eval_file.replace(f'.{suffix}', f'_{name_str}_result.{suffix}'))
+        data = load(eval_file.replace(f'.{suffix}', f'_{name_str}_result.{suffix}'))
+        
+        # 计算准确率
+        acc = report_acc(data)
+        
+        # 保存准确率结果
+        score_file = eval_file.replace(f'.{suffix}', '_acc.csv')
+        dump(acc, score_file)
+        
+        return acc 

@@ -128,7 +128,6 @@ class MSRBenchDataset(ImageMCQDataset):
         
         # 构建文本提示 - 在新格式中，question字段已经包含了选项，不需要再拼接
         question = line['question']
-        
         # 添加post_prompt，引导模型以正确格式回答
         post_prompt = "Answer with the option's letter from the given choices directly. Enclose the option's letter within ``."
         prompt = f'{question}\n{post_prompt}'
@@ -275,82 +274,82 @@ class MSRBenchCircular(MSRBenchDataset):
     
     def extract_options_from_question(self, question):
         """
-        从问题文本中提取选项。
-        格式：问题文本 + "Options:" + "A: 选项1, B: 选项2, ..."
+        从question文本中提取选项，返回(主问题文本, 选项dict)
         """
-        # 检查是否有"Options:"部分
+        # 分割出 Options: 后面的内容
         parts = question.split("Options:", 1)
         if len(parts) < 2:
-            # 如果没有找到"Options:"，返回原始问题文本和空选项
-            return parts[0].strip(), {}
+            return question.strip(), {}
         
-        # 提取问题和选项部分
         question_text = parts[0].strip()
         options_text = parts[1].strip()
         
-        # 提取选项
-        options = {}
-        # 使用正则表达式提取选项
-        pattern = r'([A-D])\s*:\s*([^,]*?)(?:,\s*[A-D]\s*:|$)'
+        # 通用的选项提取模式，适用于逗号分隔或空格分隔的情况
+        pattern = r'([A-D])\s*:\s*(.*?)(?=\s+[A-D]\s*:|,\s*[A-D]\s*:|$)'
         matches = re.findall(pattern, options_text)
-        
-        for key, value in matches:
-            options[key] = value.strip()
+        options = {m[0]: m[1].strip() for m in matches}
         
         return question_text, options
-    
-    def build_prompt(self, line):
+
+    def build_question_with_options(self, question_text, options):
         """
-        构建提示，支持多图片输入，并从question中提取选项。
+        重新拼接question和options为原格式
         """
-        if isinstance(line, int):
-            line = self.data.iloc[line]
-            
-        # 处理图片（支持多图）
-        tgt_path = self.dump_image(line)
-        
-        # 从question中提取选项
-        question_text, options = self.extract_options_from_question(line['question'])
-        
-        # 构建标准MCQ格式的提示
-        prompt = ''
-        prompt += f'Question: {question_text}\n'
-        
-        if options:
-            options_prompt = 'Options:\n'
-            for key, item in options.items():
-                options_prompt += f'{key}. {item}\n'
-            prompt += options_prompt
-            prompt += 'Please select the correct answer from the options above.\n'
-        
-        # 构建多模态消息
-        msgs = []
-        if isinstance(tgt_path, list):
-            # 处理多张图片
-            msgs.extend([dict(type='image', value=p) for p in tgt_path])
+        options_str = "Options: " + ", ".join([f"{k}: {v}" for k, v in options.items()])
+        return f"{question_text}\n{options_str}"
+
+    def load_data(self, dataset):
+        """
+        加载数据并自动生成 circular 变体，每题4种选项顺序。
+        """
+        if dataset == 'MSR_Bench_Circular':
+            tsv_path = MSRBenchDataset.MSR_BENCH_TSV
+            if not osp.exists(tsv_path):
+                raise FileNotFoundError(f"MSR_Bench TSV文件不存在: {tsv_path}")
+
+            data = pd.read_csv(tsv_path, sep='\t')
+            assert 'index' in data.columns, "TSV文件缺少'index'列"
+            assert 'question' in data.columns, "TSV文件缺少'question'列"
+
+            cp4 = ['ABCD', 'BCDA', 'CDAB', 'DABC']
+            new_rows = []
+
+            for _, row in data.iterrows():
+                question_text, options = self.extract_options_from_question(row['question'])
+                answer = row['answer'] if 'answer' in row else None
+
+                # 跳过没有选项的题
+                if not options or answer not in options:
+                    # import ipdb; ipdb.set_trace()
+                    print(f"跳过没有选项的题: {row['index']}")
+                    print(f"选项: {options}")
+                    print(f"答案: {answer}")
+                    print(f"row['question']: {row['question']}")
+                    continue
+
+                for i, order in enumerate(cp4):
+                    # 重新排列选项
+                    new_options = {k: options[o] for k, o in zip('ABCD', order) if o in options}
+                    # 计算新答案
+                    if answer in order:
+                        new_answer = 'ABCD'[order.index(answer)]
+                    else:
+                        new_answer = answer  # fallback
+
+                    # 构造新行
+                    new_row = row.copy()
+                    # 重新拼接question
+                    new_row['question'] = self.build_question_with_options(question_text, new_options)
+                    new_row['answer'] = new_answer
+                    new_row['index'] = int(row['index']) + i * 1000000
+                    new_row['g_index'] = row['index']  # 用于分组
+                    new_rows.append(new_row)
+
+            new_data = pd.DataFrame(new_rows)
+            return new_data
+
         else:
-            # 处理单张图片
-            msgs = [dict(type='image', value=tgt_path)]
-        
-        # 添加文本提示
-        msgs.append(dict(type='text', value=prompt))
-        return msgs
-    
-    def preprocess_data(self):
-        """
-        预处理数据：从question中提取选项，并添加到数据中的A、B、C、D列
-        """
-        for idx, row in self.data.iterrows():
-            question_text, options = self.extract_options_from_question(row['question'])
-            # 更新数据中的选项列
-            for key, value in options.items():
-                self.data.at[idx, key] = value
-    
-    def post_build(self, dataset):
-        """
-        在加载完数据后，进行数据预处理
-        """
-        self.preprocess_data()
+            return super(MSRBenchCircular, self).load_data(dataset)
     
     def evaluate(self, eval_file, **judge_kwargs):
         """
@@ -392,6 +391,10 @@ class MSRBenchCircular(MSRBenchDataset):
         for k in data.keys():
             data[k.lower() if k not in list(string.ascii_uppercase) else k] = data.pop(k)
         
+        # 确保数据中有g_index字段，用于circular评估
+        if 'g_index' not in data.columns:
+            data['g_index'] = data['index']
+        
         # 确保评估数据与训练数据匹配
         meta = self.data
         meta_q_map = {x: y for x, y in zip(meta['index'], meta['question'])}
@@ -400,6 +403,10 @@ class MSRBenchCircular(MSRBenchDataset):
             assert k in meta_q_map, (
                 f'eval_file should be the same as or a subset of dataset {self.dataset_name}'
             )
+        
+        # 明确标记这是一个circular evaluation
+        data['circular'] = True
+        meta['circular'] = True
         
         # 使用circular评估方法
         data = mcq_circular_eval(model, data, meta, nproc, result_file, self.dataset_name)

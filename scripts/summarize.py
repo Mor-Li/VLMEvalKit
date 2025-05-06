@@ -13,6 +13,8 @@ def get_score(model, dataset):
         'AI2D_TEST', 'MMStar', 'RealWorldQA', 'BLINK', 'VisOnlyQA-VLMEvalKit'
     ], dataset):
         file_name += '_acc.csv'
+    elif dataset == 'MSR_Bench_Circular':
+        file_name += '_simple_acc.csv'
     elif listinstr(['MME', 'Hallusion', 'LLaVABench'], dataset):
         file_name += '_score.csv'
     elif listinstr(['MMVet', 'MathVista'], dataset):
@@ -75,6 +77,14 @@ def get_score(model, dataset):
         for level in ["L1_single", "L2_objects", "L3_2d_spatial", "L4_occ",
                         "L4_pose", "L5_6d_spatial", "L5_collision"]:
             ret[f"{dataset} - {level}"] = data[f"{level}_score"] * 100
+    elif dataset == 'MSR_Bench_Circular':
+        # Handle circular evaluation results similar to other circular benchmarks
+        ret[dataset] = data['Overall'][0] * 100
+        # Add category-specific results if available
+        if len(data.columns) > 1:
+            for col in data.columns:
+                if col != 'Overall' and col != 'split':
+                    ret[f'{dataset} - {col}'] = data[col][0] * 100
     elif dataset == 'MSR_Bench':
         # Calculate overall accuracy from the score column (0 or 1 for each question)
         if 'score' in data.columns:
@@ -91,7 +101,7 @@ def get_score(model, dataset):
                 category_results = data.groupby('category')['score'].mean() * 100
                 for cat, score in category_results.items():
                     if not pd.isna(cat) and cat != 'nan':
-                        ret[f'MSR_Bench - {cat}'] = score
+                        ret[f'{dataset} - {cat}'] = score
     return ret
 
 def parse_args():
@@ -142,10 +152,24 @@ def gen_table(models, datasets):
         print("\n=== 模型性能对比 ===")
     
     dump(final, 'summ.csv')
+    
+    # 重命名列名，使表格更易读
+    columns_mapping = {}
+    for col in final.columns:
+        if col == 'Model':
+            continue
+        if ' - ' in col:
+            dataset, category = col.split(' - ', 1)
+            columns_mapping[col] = category
+        else:
+            columns_mapping[col] = col
+    
+    final_display = final.rename(columns=columns_mapping)
+    
     if len(final) >= len(final.iloc[0].keys()):
-        print(tabulate(final))
+        print(tabulate(final_display, headers='keys', showindex=True))
     else:
-        print(tabulate(final.T))
+        print(tabulate(final_display.T, headers='keys', showindex=True))
     
 if __name__ == '__main__':
     args = parse_args()

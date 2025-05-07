@@ -4,6 +4,9 @@ import os.path as osp
 from .base import BaseModel
 from ..smp import *
 import subprocess
+import tempfile
+import hashlib
+import time
 import os
 
 
@@ -112,7 +115,6 @@ class VILA(BaseModel):
 class NVILA(BaseModel):
     INSTALL_REQ = True
     INTERLEAVE = True
-    TEMP_DIR = osp.join(osp.expanduser('~'), '.nvila_temp')
 
     def __init__(self,
                  model_path='Efficient-Large-Model/NVILA-15B',
@@ -120,17 +122,6 @@ class NVILA(BaseModel):
         self.model_path = model_path
         self.model_name = model_path.split('/')[-1]
         self.kwargs = kwargs
-        
-        # Create temp directory if it doesn't exist
-        if not osp.exists(self.TEMP_DIR):
-            os.makedirs(self.TEMP_DIR)
-        
-        # Clean up any existing files in temp directory
-        for file in os.listdir(self.TEMP_DIR):
-            try:
-                os.remove(osp.join(self.TEMP_DIR, file))
-            except:
-                pass
 
     def use_custom_prompt(self, dataset):
         assert dataset is not None
@@ -146,40 +137,57 @@ class NVILA(BaseModel):
                 "\nSee: https://github.com/NVlabs/VILA/blob/main/environment_setup.sh"
             )
 
-        # Extract images and text content
-        image_paths = []
-        text_content = ''
+        # Create a unique temporary directory for this inference call
+        temp_dir = tempfile.mkdtemp(prefix='nvila_')
         
-        for msg in message:
-            if msg['type'] == 'image':
-                image_path = osp.join(self.TEMP_DIR, f'image_{len(image_paths)}.jpg')
-                Image.open(msg['value']).convert('RGB').save(image_path)
-                image_paths.append(image_path)
-            elif msg['type'] == 'text':
-                text_content += msg['value']
-
-        if not image_paths:
-            raise ValueError("No images provided for NVILA inference")
-
-        # Prepare the command - use vila-infer instead of vila-eval
-        cmd = [
-            'vila-infer',
-            '--model-path', self.model_path,
-            '--conv-mode', 'auto'
-        ]
-
-        # Add text content
-        if text_content:
-            cmd.extend(['--text', text_content])
-
-        # Add all image paths to the command - vila-infer supports multiple media files
-        cmd.append('--media')
-        cmd.extend(image_paths)
-
-        # Run the command
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        # Verify that the directory is new and empty
+        assert os.path.exists(temp_dir), f"Failed to create temporary directory: {temp_dir}"
+        assert os.listdir(temp_dir) == [], f"Temporary directory is not empty: {temp_dir}"
         
-        if result.returncode != 0:
-            raise Exception(f"vila-infer command failed: {result.stderr}")
-        
-        return result.stdout.strip()
+        try:
+            # Extract images and text content
+            image_paths = []
+            text_content = ''
+            
+            for msg in message:
+                if msg['type'] == 'image':
+                    # Generate a unique filename using timestamp and random hash
+                    unique_id = hashlib.md5(f"{time.time()}_{len(image_paths)}".encode()).hexdigest()[:8]
+                    image_path = osp.join(temp_dir, f'image_{unique_id}.jpg')
+                    Image.open(msg['value']).convert('RGB').save(image_path)
+                    image_paths.append(image_path)
+                elif msg['type'] == 'text':
+                    text_content += msg['value']
+
+            if not image_paths:
+                raise ValueError("No images provided for NVILA inference")
+
+            # Prepare the command
+            cmd = [
+                'vila-infer',
+                '--model-path', self.model_path,
+                '--conv-mode', 'auto'
+            ]
+
+            # Add text content
+            if text_content:
+                cmd.extend(['--text', text_content])
+
+            # Add all image paths to the command
+            cmd.append('--media')
+            cmd.extend(image_paths)
+
+            # Run the command
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                raise Exception(f"vila-infer command failed: {result.stderr}")
+            
+            return result.stdout.strip()
+            
+        finally:
+            # Clean up the temporary directory and its contents
+            try:
+                shutil.rmtree(temp_dir)
+            except Exception as e:
+                logging.warning(f"Failed to clean up temporary directory {temp_dir}: {e}")

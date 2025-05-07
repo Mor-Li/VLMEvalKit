@@ -114,8 +114,8 @@ MODELS = [
 
 
     
-# MODELS = [   *api_models
-# ]
+MODELS = [   *api_models
+]
 
 print(f"python scripts/summarize.py --model {' '.join(MODELS)} --data {DATASET}")
 # python scripts/summarize.py --model InternVL2_5-1B InternVL2_5-2B InternVL2_5-4B InternVL2_5-8B InternVL2_5-26B InternVL2_5-38B InternVL2_5-78B InternVL3-1B InternVL3-2B InternVL3-8B InternVL3-9B InternVL3-14B InternVL3-38B InternVL3-78B Qwen2.5-VL-3B-Instruct Qwen2.5-VL-7B-Instruct Qwen2.5-VL-32B-Instruct Qwen2.5-VL-72B-Instruct llava_onevision_qwen2_0.5b_ov llava_onevision_qwen2_7b_ov llava_onevision_qwen2_72b_ov Llama-3.2-11B-Vision-Instruct deepseek_vl2_tiny deepseek_vl2_small deepseek_vl2 \ gpt-4.1-2025-04-14 DoubaoVL --data MMBench_DEV_EN_V11 MSR_Bench MSR_Bench_Circular 

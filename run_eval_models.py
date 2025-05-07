@@ -30,9 +30,18 @@ CMD_TEMPLATE = (
     f"cd {PROJECT_DIR} && conda activate ENV_NAME && python run.py --data {DATASET} --model MODEL_NAME --verbose --reuse"
 )
 
+TORCH_RUN_CMD_TEMPLATE = (
+    f"cd {PROJECT_DIR} && conda activate ENV_NAME && torchrun --nproc-per-node=NUMBER_OF_PROC  run.py --data {DATASET}  --model MODEL_NAME  --verbose --reuse"
+)
+
+TORCH_RUN_MODELS = [
+    "NVILA-8B",
+    "NVILA-15B",
+]
+
 api_models = [
     # "GPT4o_20240806",
-    "gpt-4.1-2025-04-14",
+    # "gpt-4.1-2025-04-14",
     # "GPT4.5"
     # "Claude3-7V_Sonnet_Internal",
     # "GeminiPro2-5", # 需要开代理
@@ -96,12 +105,12 @@ MODELS = [    "InternVL3-14B","llava_onevision_qwen2_0.5b_ov","llava_onevision_q
 ]
 
 MODELS = [    
-        #   "NVILA-8B", # 正在下载path
+    "NVILA-8B", # 正在下载path
     "NVILA-15B", # 正在下载path"
 ]
-MODELS = [    
-    "llava_onevision_qwen2_0.5b_ov"
-]
+# MODELS = [    
+#     "llava_onevision_qwen2_0.5b_ov"
+# ]
 
 
     
@@ -272,8 +281,22 @@ def main():
         if env_exists != "✓":
             print(f"警告: 环境 {env} 不存在，请先运行克隆脚本，跳过模型 {model}")
             continue
-        cmd = CMD_TEMPLATE.replace("ENV_NAME", env).replace("MODEL_NAME", model)
-        print(f"提交任务: {model} (环境: {env}, GPU: {gpu_count})")
+        
+        # 检查是否是需要使用torchrun的模型
+        if model in TORCH_RUN_MODELS:
+            # 对于torchrun模型，总是申请8张卡，并计算nproc-per-node参数
+            total_gpus = 8
+            nproc_per_node = total_gpus // gpu_count
+            # 确保至少有1个进程
+            nproc_per_node = max(1, nproc_per_node)
+            cmd = TORCH_RUN_CMD_TEMPLATE.replace("ENV_NAME", env).replace("MODEL_NAME", model).replace("NUMBER_OF_PROC", str(nproc_per_node))
+            print(f"提交torchrun任务: {model} (环境: {env}, 总GPU: {total_gpus}, nproc-per-node: {nproc_per_node})")
+            # 使用固定的8张卡
+            gpu_count = total_gpus
+        else:
+            cmd = CMD_TEMPLATE.replace("ENV_NAME", env).replace("MODEL_NAME", model)
+            print(f"提交普通任务: {model} (环境: {env}, GPU: {gpu_count})")
+        
         # 直接用python版本的volcrun
         try:
             random.seed(idx)

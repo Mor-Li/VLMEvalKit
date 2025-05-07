@@ -377,7 +377,7 @@ def main():
                     ):
                         if listinstr(['WeMath'], dataset_name):
                             judge_kwargs['model'] = 'gpt-4o-mini'
-                        elif listinstr(['VisuLogic'], dataset_name):
+                        elif listinstr(['VisuLogic', 'MSR_Bench_Circular'], dataset_name):
                             judge_kwargs['model'] = 'exact_matching'
                         else:
                             judge_kwargs['model'] = 'chatgpt-0125'

@@ -13,6 +13,10 @@ PROJECT_DIR = "/fs-computility/mllm1/limo/workspace/VLMEvalKit"
 
 # 要评测的数据集
 DATASET = "MSR_Bench"
+# DATASET = "MMBench_DEV_EN_V11"
+DATASET = "MSR_Bench MMBench_DEV_EN_V11 MSR_Bench_Circular"
+# DATASET = "MSR_Bench MSR_Bench_Circular"
+# DATASET = "MSR_Bench_Circular"
 
 # 解析命令行参数
 def parse_args():
@@ -23,17 +27,17 @@ def parse_args():
 
 # 基础命令模板
 CMD_TEMPLATE = (
-    f"cd {PROJECT_DIR} && conda activate ENV_NAME && python run.py --data {DATASET} --model MODEL_NAME --verbose"
+    f"cd {PROJECT_DIR} && conda activate ENV_NAME && python run.py --data {DATASET} --model MODEL_NAME --verbose --reuse"
 )
 
 api_models = [
-    "GPT4o_20240806",
+    # "GPT4o_20240806",
     "gpt-4.1-2025-04-14",
-    "GPT4.5"
-    "Claude3-7V_Sonnet_Internal",
-    "GeminiPro2-5",
-    "GeminiFlash2-thinking",
-    "GeminiFlash2",
+    # "GPT4.5"
+    # "Claude3-7V_Sonnet_Internal",
+    # "GeminiPro2-5", # 需要开代理
+    # "GeminiFlash2-thinking",
+    # "GeminiFlash2",
     "DoubaoVL",
 ]
     
@@ -77,7 +81,7 @@ MODELS = [
     # "VILA1.5-40b",
 
     # 6. meta-llama/Llama-3.2-11B-Vision-Instruct
-    "Llama-3.2-11B-Vision-Instruct",
+    "Llama-3.2-11B-Vision-Instruct", # 正在下载path
 
     # 7. deepseek-ai/deepseek-vl2 系列（所有大小）
     "deepseek_vl2_tiny",
@@ -85,14 +89,26 @@ MODELS = [
     "deepseek_vl2",
        
     # API models
-    *api_models,
+    # *api_models,
 ]
-# MODELS = [ "Qwen2.5-VL-32B-Instruct"]
+
+MODELS = [    "InternVL3-14B","llava_onevision_qwen2_0.5b_ov","llava_onevision_qwen2_72b_ov"
+]
+
+MODELS = [    
+        #   "NVILA-8B", # 正在下载path
+    "NVILA-15B", # 正在下载path"
+]
+
+
+    
+# MODELS = [   *api_models
+# ]
 
 print(f"python scripts/summarize.py --model {' '.join(MODELS)} --data {DATASET}")
-# python scripts/summarize.py --model InternVL2_5-1B InternVL2_5-2B InternVL2_5-4B InternVL2_5-8B InternVL2_5-26B InternVL2_5-38B InternVL2_5-78B InternVL3-1B InternVL3-2B InternVL3-8B InternVL3-9B InternVL3-14B InternVL3-38B InternVL3-78B Qwen2.5-VL-3B-Instruct Qwen2.5-VL-7B-Instruct Qwen2.5-VL-32B-Instruct Qwen2.5-VL-72B-Instruct llava_onevision_qwen2_0.5b_ov llava_onevision_qwen2_7b_ov llava_onevision_qwen2_72b_ov Llama-3.2-11B-Vision-Instruct deepseek_vl2_tiny deepseek_vl2_small deepseek_vl2 GPT4o_20240806 gpt-4.1-2025-04-14 Claude3-7V_Sonnet_Internal GeminiPro2-5 GeminiFlash2-0 DoubaoVL --data MSR_Bench
+# python scripts/summarize.py --model InternVL2_5-1B InternVL2_5-2B InternVL2_5-4B InternVL2_5-8B InternVL2_5-26B InternVL2_5-38B InternVL2_5-78B InternVL3-1B InternVL3-2B InternVL3-8B InternVL3-9B InternVL3-14B InternVL3-38B InternVL3-78B Qwen2.5-VL-3B-Instruct Qwen2.5-VL-7B-Instruct Qwen2.5-VL-32B-Instruct Qwen2.5-VL-72B-Instruct llava_onevision_qwen2_0.5b_ov llava_onevision_qwen2_7b_ov llava_onevision_qwen2_72b_ov Llama-3.2-11B-Vision-Instruct deepseek_vl2_tiny deepseek_vl2_small deepseek_vl2 \ gpt-4.1-2025-04-14 DoubaoVL --data MMBench_DEV_EN_V11 MSR_Bench MSR_Bench_Circular 
 
-# python scripts/summarize.py --model InternVL2_5-1B InternVL2_5-2B InternVL2_5-4B InternVL2_5-8B InternVL2_5-26B InternVL2_5-38B InternVL2_5-78B  --data MSR_Bench
+# python scripts/summarize.py --model InternVL2_5-1B InternVL2_5-2B InternVL2_5-4B InternVL2_5-8B InternVL2_5-26B InternVL2_5-38B InternVL2_5-78B  --data MMBench_DEV_EN_V11 MSR_Bench MSR_Bench_Circular 
 
 # 检查映射文件是否存在
 def check_map_files():
@@ -122,6 +138,7 @@ def get_env(model):
                 if len(parts) >= 2 and parts[0] == model:
                     return parts[1]
     return "th25tr446"  # 默认环境
+# pip install google-generativeai
 
 def get_gpu_count(model):
     # 如果是API模型，则不需要卡，返回0
@@ -182,7 +199,7 @@ def collect_model_info():
     for model in MODELS:
         env = get_env(model)
         gpu_count = get_gpu_count(model)
-        gpu_count = 8
+        # gpu_count = 8
         env_exists = "✓" if check_env_exists(env, all_envs) else "✗"
         rows.append({
             "模型名称": model,

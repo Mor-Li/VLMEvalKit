@@ -937,8 +937,8 @@ vila_series = {
     ),
     "VILA1.5-13b": partial(VILA, model_path="Efficient-Large-Model/VILA1.5-13b"),
     "VILA1.5-40b": partial(VILA, model_path="Efficient-Large-Model/VILA1.5-40b"),
-    "NVILA-8B": partial(VILA, model_path="/fs-computility/mllm1/limo/workspace/VLMEvalKit/images/models/models--efficient-large-model--NVILA-8B"),
-    "NVILA-15B": partial(VILA, model_path="/fs-computility/mllm1/limo/workspace/VLMEvalKit/images/models/models--efficient-large-model--NVILA-15B"),
+    "NVILA-8B": partial(NVILA, model_path="/fs-computility/mllm1/limo/workspace/VLMEvalKit/images/models/models--efficient-large-model--NVILA-8B"),
+    "NVILA-15B": partial(NVILA, model_path="/fs-computility/mllm1/limo/workspace/VLMEvalKit/images/models/models--efficient-large-model--NVILA-15B"),
 }
 
 ovis_series = {

@@ -62,6 +62,7 @@ class VolcanoConfig:
         'VLLM_WORKER_MULTIPROC_METHOD=spawn',
         'LMUData=/fs-computility/mllm1/shared/LMUData',
         'MKL_SERVICE_FORCE_INTEL=1',
+        'TMPDIR=/fs-computility/llm/shared/limo/data/tmp',
     ])
     image: str = "fs-computility-cn-beijing.cr.volces.com/devinstance-archive/moli-opencompass:1.4"  # Docker镜像
 

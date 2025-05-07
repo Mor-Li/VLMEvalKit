@@ -532,7 +532,9 @@ class LLaVA_OneVision(BaseModel):
 
         rank, world_size = get_rank_and_world_size()
         model_name = get_model_name_from_path(model_path)
-
+        import warnings
+        # filter warning align with official code
+        warnings.filterwarnings("ignore")
         tokenizer, model, image_processor, _ = load_pretrained_model(
             model_path,
             None,
@@ -573,15 +575,20 @@ class LLaVA_OneVision(BaseModel):
         content, images = "", []
         image_sizes = []  # Store image sizes
 
-        for msg in message:
+        for idx, msg in enumerate(message):
             if msg["type"] == "text":
                 content += msg["value"]
             else:
                 img = Image.open(msg["value"]).convert("RGB")
                 images.append(img)
                 image_sizes.append(img.size)  # Store the size of each image
-                content += self.DEFAULT_IMAGE_TOKEN + "\n"
-
+                # image和image之间加空格，最后一个image后面直接回车
+                if idx == len(message) - 1 or all(m["type"] == "text" for m in message[idx+1:]):
+                    content += self.DEFAULT_IMAGE_TOKEN + "\n"
+                else:
+                    content += self.DEFAULT_IMAGE_TOKEN + " "
+        
+        
         # Process images using the class attribute self.process_images
         image_tensor = self.process_images(
             images, self.image_processor, self.model.config
@@ -594,7 +601,8 @@ class LLaVA_OneVision(BaseModel):
         conv.append_message(conv.roles[0], content)
         conv.append_message(conv.roles[1], None)
         prompt_question = conv.get_prompt()
-
+        # print(prompt_question.replace('\n', '\\n'))
+        # raise Exception("stop here")
         input_ids = self.tokenizer_image_token(
             prompt_question, self.tokenizer, self.IMAGE_TOKEN_INDEX, return_tensors="pt"
         )

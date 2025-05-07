@@ -99,6 +99,9 @@ MODELS = [
         #   "NVILA-8B", # 正在下载path
     "NVILA-15B", # 正在下载path"
 ]
+MODELS = [    
+    "llava_onevision_qwen2_0.5b_ov"
+]
 
 
     

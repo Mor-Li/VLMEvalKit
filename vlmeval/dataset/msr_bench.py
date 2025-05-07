@@ -172,7 +172,7 @@ class MSRBenchDataset(ImageMCQDataset):
             pred = row['prediction']
             
             # 使用提供的函数提取选项
-            extracted_pred = cls.extract_single_choice_with_word_boundary(pred, gt)
+            extracted_pred = cls.extract_single_choice_with_word_boundary(pred)
             
             # 记录提取的预测结果
             data.at[idx, 'extracted_pred'] = extracted_pred

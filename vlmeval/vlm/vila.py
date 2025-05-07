@@ -1,12 +1,10 @@
 import torch
 from PIL import Image
-from abc import abstractproperty
-import sys
 import os.path as osp
 from .base import BaseModel
 from ..smp import *
-from ..dataset import DATASET_TYPE
-import copy
+import subprocess
+import os
 
 
 class VILA(BaseModel):
@@ -110,3 +108,78 @@ class VILA(BaseModel):
 
             output = self.tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0].strip()
         return output
+
+class NVILA(BaseModel):
+    INSTALL_REQ = True
+    INTERLEAVE = True
+    TEMP_DIR = osp.join(osp.expanduser('~'), '.nvila_temp')
+
+    def __init__(self,
+                 model_path='Efficient-Large-Model/NVILA-15B',
+                 **kwargs):
+        self.model_path = model_path
+        self.model_name = model_path.split('/')[-1]
+        self.kwargs = kwargs
+        
+        # Create temp directory if it doesn't exist
+        if not osp.exists(self.TEMP_DIR):
+            os.makedirs(self.TEMP_DIR)
+        
+        # Clean up any existing files in temp directory
+        for file in os.listdir(self.TEMP_DIR):
+            try:
+                os.remove(osp.join(self.TEMP_DIR, file))
+            except:
+                pass
+
+    def use_custom_prompt(self, dataset):
+        assert dataset is not None
+        return False
+
+    def generate_inner(self, message, dataset=None):
+        import shutil
+
+        # Check if 'vila-infer' command exists
+        if shutil.which('vila-infer') is None:
+            raise RuntimeError(
+                "'vila-infer' command not found. Please set up the environment first."
+                "\nSee: https://github.com/NVlabs/VILA/blob/main/environment_setup.sh"
+            )
+
+        # Extract images and text content
+        image_paths = []
+        text_content = ''
+        
+        for msg in message:
+            if msg['type'] == 'image':
+                image_path = osp.join(self.TEMP_DIR, f'image_{len(image_paths)}.jpg')
+                Image.open(msg['value']).convert('RGB').save(image_path)
+                image_paths.append(image_path)
+            elif msg['type'] == 'text':
+                text_content += msg['value']
+
+        if not image_paths:
+            raise ValueError("No images provided for NVILA inference")
+
+        # Prepare the command - use vila-infer instead of vila-eval
+        cmd = [
+            'vila-infer',
+            '--model-path', self.model_path,
+            '--conv-mode', 'auto'
+        ]
+
+        # Add text content
+        if text_content:
+            cmd.extend(['--text', text_content])
+
+        # Add all image paths to the command - vila-infer supports multiple media files
+        cmd.append('--media')
+        cmd.extend(image_paths)
+
+        # Run the command
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            raise Exception(f"vila-infer command failed: {result.stderr}")
+        
+        return result.stdout.strip()

@@ -59,7 +59,7 @@ from ..smp import *
 from .Omnidocbench.omnidocbench import OmniDocBench
 from .moat import MOAT
 from .mmifeval import MMIFEval
-from .msr_bench import MSRBenchDataset
+from .msr_bench import MSRBenchDataset, MSRBenchCircular
 
 
 class ConcatDataset(ImageBaseDataset):
@@ -160,7 +160,7 @@ IMAGE_DATASET = [
     VLM2Bench, VMCBenchDataset, EMMADataset, MME_CoT, MOAT, MedXpertQA_MM_test,
     LEGO, MMSci_Captioning, Physics_yale, MMIFEval, Spatial457, VisuLogic, CVBench,
     CMMU_MCQ, PathVQA_VAL, PathVQA_TEST, PathMMU_VAL, PathMMU_TEST, TDBench, TDBenchGrounding,
-    MSRBenchDataset
+    MSRBenchDataset, MSRBenchCircular
 ]
 
 

@@ -1,16 +1,7 @@
 from vlmeval.smp import *
 import os
-import sys
 from vlmeval.api.base import BaseAPI
-import math
-from vlmeval.dataset import DATASET_TYPE
 from vlmeval.dataset import img_root_map
-from io import BytesIO
-import pandas as pd
-import requests
-import json
-import base64
-import time
 from openai import OpenAI
 
 
@@ -35,8 +26,6 @@ class DoubaoVLWrapper(BaseAPI):
         self.fail_msg = 'Failed to obtain answer via API. '
         self.temperature = temperature
         self.max_tokens = max_tokens
-
-        warnings.warn('You may need to set the env variable  DOUBAO_VL_KEY& DOUBAO_VL_ENDPOINT to use DOUBAO_VL.')
 
         key = os.environ.get('DOUBAO_VL_KEY', None)
         assert key is not None, 'Please set the environment variable DOUBAO_VL_KEY. '

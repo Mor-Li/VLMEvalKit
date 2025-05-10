@@ -753,12 +753,17 @@ class MSRBenchCircular(MSRBenchDataset):
         # 提取前统计缓存文件数量
         cache_files_before = len(glob.glob(os.path.join(cache_dir, "choice_cache_*.json")))
         
-        data['extracted_pred'] = MSRBenchDataset.batch_extract_choices_with_llm(
-            data.to_dict('records'), 
-            num_processes=num_processes,
-            cache_dir=cache_dir,
-            use_single_thread=use_single_thread
-        )
+        # data['extracted_pred'] = MSRBenchDataset.batch_extract_choices_with_llm(
+        #     data.to_dict('records'), 
+        #     num_processes=num_processes,
+        #     cache_dir=cache_dir,
+        #     use_single_thread=use_single_thread
+        # )
+        
+        
+        # extracted_pred_exactmatch
+        data['extracted_pred'] = data['prediction'].apply(MSRBenchDataset.extract_single_choice_with_word_boundary)
+        import ipdb; ipdb.set_trace()
         
         # 提取后统计缓存文件数量
         cache_files_after = len(glob.glob(os.path.join(cache_dir, "choice_cache_*.json")))
@@ -870,18 +875,40 @@ class MSRBenchCircular(MSRBenchDataset):
         
         # 创建报告格式
         combined_acc = {}
-        for key in circular_acc.keys():
-            combined_acc[key] = {
-                'Circular': circular_acc[key],
-                'Vanilla': vanilla_acc[key]
+        
+        # 添加总体结果
+        combined_acc['Overall'] = {
+            'Circular': circular_acc['Overall'],
+            'Vanilla': vanilla_acc['Overall']
+        }
+        
+        # 添加各个类别的结果
+        for cat in categories:
+            combined_acc[cat] = {
+                'Circular': circular_acc[cat],
+                'Vanilla': vanilla_acc[cat]
             }
         
+        # 使用有意义的索引名称创建 DataFrame
         combined_df = pd.DataFrame(combined_acc).T
         combined_df.index.name = 'Category'
         
+        # 确保 Overall 在第一行
+        if 'Overall' in combined_df.index:
+            # 获取 Overall 行的数据
+            overall_data = combined_df.loc['Overall']
+            # 删除原始的 Overall 行
+            combined_df = combined_df.drop('Overall')
+            # 使用 pd.concat 将 Overall 行添加到 DataFrame 的开头
+            combined_df = pd.concat([pd.DataFrame({'Circular': [overall_data['Circular']], 
+                                                  'Vanilla': [overall_data['Vanilla']]}, 
+                                               index=['Overall']), 
+                                  combined_df])
+        
         # 保存准确率结果
         score_file = eval_file.replace(f'.{suffix}', f'_combined_acc.csv')
-        dump(combined_df, score_file)
+        # 确保保存的CSV文件包含行索引
+        combined_df.to_csv(score_file)
         
         # 输出最终结果
         print(f"\n====== MSR_Bench 评测结果 ======")

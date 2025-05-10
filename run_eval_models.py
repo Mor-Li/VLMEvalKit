@@ -4,7 +4,15 @@
 
 # python run.py --model  Claude3-7V_Sonnet_Internal Claude3-7V_Sonnet_Internal_thinking GeminiPro2-5-0506 DoubaoVL --data MSR_Bench_Circular  --reuse       
 
-# python run.py --model  Claude3-7V_Sonnet_Internal Claude3-7V_Sonnet_Internal_thinking  DoubaoVL --data MSR_Bench_Circular  --reuse   
+# python run.py --model  Claude3-7V_Sonnet_Internal Claude3-7V_Sonnet_Internal_thinking NVILA-8B  DoubaoVL --data MSR_Bench_Circular  --reuse   
+# python run.py --model NVILA-8B --data MSR_Bench_Circular  --reuse   
+
+# 传统的方式的提取的答案的方法
+# python scripts/summarize.py --model InternVL2_5-1B InternVL2_5-2B InternVL2_5-4B InternVL2_5-8B InternVL2_5-26B InternVL2_5-38B InternVL2_5-78B InternVL3-1B InternVL3-2B InternVL3-8B InternVL3-9B InternVL3-14B InternVL3-38B InternVL3-78B Qwen2.5-VL-3B-Instruct Qwen2.5-VL-7B-Instruct Qwen2.5-VL-32B-Instruct Qwen2.5-VL-72B-Instruct llava_onevision_qwen2_0.5b_ov llava_onevision_qwen2_7b_ov llava_onevision_qwen2_72b_ov Llama-3.2-11B-Vision-Instruct deepseek_vl2_tiny deepseek_vl2_small deepseek_vl2 NVILA-8B NVILA-15B  --data MSR_Bench_Circular 
+
+# 用api的提取出来的答案的api的model 对于claude 和gemini
+
+# python scripts/summarize.py --model Claude3-7V_Sonnet_Internal Claude3-7V_Sonnet_Internal_thinking NVILA-8B  --data MSR_Bench_Circular 
 
 
 import os

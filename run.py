@@ -221,7 +221,7 @@ def main():
         import torch.distributed as dist
         dist.init_process_group(
             backend='nccl',
-            timeout=datetime.timedelta(seconds=int(os.environ.get('DIST_TIMEOUT', 3600)))
+            timeout=datetime.timedelta(seconds=int(os.environ.get('DIST_TIMEOUT', 360000)))
         )
 
     for _, model_name in enumerate(args.model):
@@ -377,7 +377,7 @@ def main():
                     ):
                         if listinstr(['WeMath'], dataset_name):
                             judge_kwargs['model'] = 'gpt-4o-mini'
-                        elif listinstr(['VisuLogic', 'MSR_Bench_Circular'], dataset_name):
+                        elif listinstr(['VisuLogic'], dataset_name):
                             judge_kwargs['model'] = 'exact_matching'
                         else:
                             judge_kwargs['model'] = 'chatgpt-0125'

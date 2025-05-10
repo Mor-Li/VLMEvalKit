@@ -353,8 +353,22 @@ api_models = {
         temperature=0,
         retry=10,
         verbose=False,
+        img_size=-1,
+        img_detail='high',
     ),
-
+    "Claude3-7V_Sonnet_Internal_thinking": partial(
+        GPT4V,
+        model="claude-3-7-sonnet-20250219",
+        temperature=0,
+        retry=10,
+        verbose=False,
+        img_size=-1,
+        img_detail='high',
+        extra_body={
+        "thinking": {"type": "enabled", "budget_tokens": 2000}
+        # https://docs.anthropic.com/en/api/openai-sdk#extended-thinking-support:~:text=%22thinking%22%3A%20%7B%20%22type%22%3A%20%22enabled%22%2C%20%22budget_tokens%22%3A%202000%20%7D
+        },
+    ),
     # GLM4V
     "GLM4V": partial(GLMVisionAPI, model="glm4v-biz-eval", temperature=0, retry=10),
     "GLM4V_PLUS": partial(GLMVisionAPI, model="glm-4v-plus", temperature=0, retry=10),

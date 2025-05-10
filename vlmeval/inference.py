@@ -3,6 +3,7 @@ import torch.distributed as dist
 from vlmeval.config import supported_VLM
 from vlmeval.utils import track_progress_rich
 from vlmeval.smp import *
+import time
 
 FAIL_MSG = 'Failed to obtain answer via API.'
 
@@ -194,8 +195,36 @@ def infer_data_job(
             data_all.update(load(tmpl.format(i)))
 
         data = dataset.data
-        for x in data['index']:
-            assert x in data_all
+        # 添加重试机制，最多重试3次，每次等待60秒
+        max_retries = 3
+        retry_count = 0
+        missing_indices = []
+        
+        while retry_count < max_retries:
+            missing_indices = []
+            for x in data['index']:
+                if x not in data_all:
+                    missing_indices.append(x)
+            
+            if not missing_indices:  # 如果没有缺失的索引，跳出循环
+                break
+                
+            if retry_count < max_retries - 1:  # 如果不是最后一次尝试，等待并重试
+                print(f"[Rank 0] Missing {len(missing_indices)} indices in combined results. Waiting 60 seconds and retrying... (Attempt {retry_count+1}/{max_retries})")
+                print(f"[Rank 0] Missing indices: {missing_indices[:10]}{'...' if len(missing_indices) > 10 else ''}")
+                time.sleep(60)  # 等待60秒
+            
+            retry_count += 1
+        
+        # 如果3次重试后仍有缺失，报错
+        if missing_indices:
+            missing_str = ', '.join(map(str, missing_indices[:20]))
+            if len(missing_indices) > 20:
+                missing_str += f"... (and {len(missing_indices) - 20} more)"
+            error_msg = f"After {max_retries} retries, still missing {len(missing_indices)} indices: {missing_str}"
+            print(f"[Rank 0] ERROR: {error_msg}")
+            assert False, error_msg
+        
         data['prediction'] = [str(data_all[x]) for x in data['index']]
         if 'image' in data:
             data.pop('image')

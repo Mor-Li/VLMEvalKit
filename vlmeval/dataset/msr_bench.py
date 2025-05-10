@@ -5,10 +5,12 @@ import os.path as osp
 import json
 import numpy as np
 import warnings
+from tqdm import tqdm
 from .image_mcq import ImageMCQDataset
 from .utils import DEBUG_MESSAGE, build_judge
 from ..smp import LMUDataRoot, file_size, load, dump, decode_base64_to_image_file, listinstr, gpt_key_set
 import string
+import glob
 
 class MSRBenchDataset(ImageMCQDataset):
     """
@@ -260,6 +262,361 @@ class MSRBenchDataset(ImageMCQDataset):
             
         return pred 
 
+    @staticmethod
+    def extract_single_choice_with_llm(pred, question=None, cache_dir=None):
+        """
+        Extract a single choice answer from a prediction using an LLM.
+        Uses concurrency and caching to improve performance.
+        
+        Args:
+            pred (str): The prediction text to extract a choice from
+            question (str, optional): The question text containing options. Default is None.
+            cache_dir (str, optional): Directory for caching results. Default is 'output_dir'.
+        
+        Returns:
+            str: The extracted choice (A, B, C, D, or Z for no match)
+        """
+        import hashlib
+        import os
+        import json
+        from concurrent.futures import ProcessPoolExecutor
+        from .utils import build_judge
+        
+        # Setup cache directory
+        if cache_dir is None:
+            cache_dir = os.environ.get('OUTPUT_DIR', 'output_dir')
+        
+        os.makedirs(cache_dir, exist_ok=True)
+        
+        # Create cache key from question and prediction
+        def get_cache_path(question, pred):
+            combined = (question or "") + (pred or "")
+            hash_key = hashlib.md5(combined.encode()).hexdigest()
+            return os.path.join(cache_dir, f"choice_cache_{hash_key}.json")
+        
+        cache_path = get_cache_path(question, pred)
+        
+        # Check cache first
+        if os.path.exists(cache_path):
+            try:
+                with open(cache_path, 'r') as f:
+                    cached_data = json.load(f)
+                    return cached_data.get('choice', 'Z')
+            except:
+                # If there's any error with the cache, proceed without it
+                pass
+        
+        # Build the model using build_judge
+        model = build_judge(model='chatgpt-0125')
+        
+        # Build the prompt for the LLM
+        prompt = (
+            'You are an AI assistant who will help me to match '
+            'an answer with several options of a single-choice question. '
+            'You are provided with a question and an answer, '
+            'and you need to find which option is most similar to the answer. '
+            'If the meaning of all options are significantly different from the answer, output Z. '
+            'Your should output a single uppercase character in A, B, C, D (if they are valid options), and Z. '
+            'Do not explain your reasoning, just output the letter directly.\n'
+            'Example 1: \n'
+            'Question: What is the main object in image?\nOptions: A. teddy bear B. rabbit C. cat D. dog\n'
+            'Answer: a cute teddy bear\nYour output: A\n'
+            'Example 2: \n'
+            'Question: What is the main object in image?\nOptions: A. teddy bear B. rabbit C. cat D. dog\n'
+            'Answer: Spider\nYour output: Z\n'
+            'Example 3: \n'
+            f'Question: {question}\nAnswer: {pred}\nYour output: '
+        )
+        
+        retry = 3
+        while retry:
+            try:
+                ans = model.generate(prompt)
+                # Try to extract the choice from the answer
+                choice = None
+                
+                # First look for a single letter answer
+                match = re.search(r'\b([A-DZ])\b', ans)
+                if match:
+                    choice = match.group(1)
+                
+                # Also look for patterns like "(A)" or "A."
+                if not choice:
+                    match = re.search(r'[\(\s]([A-DZ])[\)\.\s]', ans)
+                    if match:
+                        choice = match.group(1)
+                
+                if choice and choice in "ABCDZ":
+                    # Save to cache
+                    try:
+                        with open(cache_path, 'w') as f:
+                            json.dump({
+                                'choice': choice,
+                                'full_response': ans,
+                                'prompt': prompt
+                            }, f)
+                    except:
+                        # If caching fails, just continue
+                        pass
+                    
+                    return choice
+            except:
+                pass
+            
+            retry -= 1
+        
+        # If all attempts failed, return Z
+        # Save failure to cache too
+        try:
+            with open(cache_path, 'w') as f:
+                json.dump({
+                    'choice': 'Z',
+                    'full_response': 'Failed to extract',
+                    'prompt': prompt
+                }, f)
+        except:
+            pass
+            
+        return "Z"
+
+    @staticmethod
+    def _process_single_item(row_dict, cache_dir='output_dir'):
+        """
+        处理单个项目的工作函数，用于并行处理
+        
+        Args:
+            row_dict (dict): 数据行字典
+            cache_dir (str): 缓存目录
+            
+        Returns:
+            str: 提取的选项
+        """
+        import time
+        import random
+        import sys
+        import os
+        import hashlib
+        import json
+        import re
+        
+        try:
+            pred = row_dict['prediction']
+            question = row_dict['question']
+            
+            # 构建缓存路径
+            def get_cache_path(question, pred):
+                # 规范化输入，删除所有空白字符，确保每次生成相同的哈希值
+                combined = ((question or "") + (pred or "")).strip()
+                # 仅使用前1000个字符计算哈希，避免超长文本
+                combined = combined[:1000]
+                hash_key = hashlib.md5(combined.encode('utf-8', errors='ignore')).hexdigest()
+                return os.path.join(cache_dir, f"choice_cache_{hash_key}.json")
+            
+            cache_path = get_cache_path(question, pred)
+            
+            # 检查缓存 - 添加详细日志
+            if os.path.exists(cache_path):
+                try:
+                    with open(cache_path, 'r', encoding='utf-8') as f:
+                        cached_data = json.load(f)
+                        choice = cached_data.get('choice', None)
+                        if choice and choice in "ABCDZ":
+                            print(f"✅ 缓存命中: {cache_path}")
+                            return choice
+                        else:
+                            print(f"❌ 缓存格式无效: {cache_path}")
+                except Exception as e:
+                    print(f"❌ 读取缓存出错 {cache_path}: {e}")
+            else:
+                print(f"⚠️ 缓存不存在: {cache_path}")
+            
+            # 添加随机延迟以避免API速率限制
+            time.sleep(random.uniform(0, 0.2))
+            
+            # 直接调用静态方法处理
+            from .utils import build_judge
+            
+            # 构建模型
+            model = build_judge(model='chatgpt-0125')
+            
+            # 构建提示
+            prompt = (
+                'You are an AI assistant who will help me to match '
+                'an answer with several options of a single-choice question. '
+                'You are provided with a question and an answer, '
+                'and you need to find which option is most similar to the answer. '
+                'If the meaning of all options are significantly different from the answer, output Z. '
+                'Your should output a single uppercase character in A, B, C, D (if they are valid options), and Z. '
+                'Do not explain your reasoning, just output the letter directly.\n'
+                'Example 1: \n'
+                'Question: What is the main object in image?\nOptions: A. teddy bear B. rabbit C. cat D. dog\n'
+                'Answer: a cute teddy bear\nYour output: A\n'
+                'Example 2: \n'
+                'Question: What is the main object in image?\nOptions: A. teddy bear B. rabbit C. cat D. dog\n'
+                'Answer: Spider\nYour output: Z\n'
+                'Example 3: \n'
+                f'Question: {question}\nAnswer: {pred}\nYour output: '
+            )
+            
+            # 调用模型
+            retry = 3
+            while retry:
+                try:
+                    ans = model.generate(prompt)
+                    # 提取选项
+                    choice = None
+                    
+                    # 首先查找单个字母答案
+                    match = re.search(r'\b([A-DZ])\b', ans)
+                    if match:
+                        choice = match.group(1)
+                    
+                    # 还查找类似"(A)"或"A."的模式
+                    if not choice:
+                        match = re.search(r'[\(\s]([A-DZ])[\)\.\s]', ans)
+                        if match:
+                            choice = match.group(1)
+                    
+                    if choice and choice in "ABCDZ":
+                        # 保存到缓存
+                        try:
+                            os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+                            with open(cache_path, 'w', encoding='utf-8') as f:
+                                cache_data = {
+                                    'choice': choice,
+                                    'full_response': ans,
+                                    'prompt': prompt
+                                }
+                                json.dump(cache_data, f, ensure_ascii=False)
+                                print(f"✅ 缓存已保存: {cache_path}")
+                        except Exception as e:
+                            print(f"❌ 保存缓存失败 {cache_path}: {e}")
+                        
+                        return choice
+                except Exception as e:
+                    print(f"❌ 调用模型出错: {e}")
+                
+                retry -= 1
+            
+            # 如果所有尝试都失败，返回Z
+            # 保存失败结果到缓存
+            try:
+                with open(cache_path, 'w', encoding='utf-8') as f:
+                    json.dump({
+                        'choice': 'Z',
+                        'full_response': '调用失败',
+                        'prompt': prompt
+                    }, f, ensure_ascii=False)
+                    print(f"⚠️ 保存默认缓存(Z): {cache_path}")
+            except Exception as e:
+                print(f"❌ 保存默认缓存失败: {e}")
+            
+            return "Z"
+        except Exception as e:
+            print(f"❌ 处理项目时出错: {e}")
+            return "Z"  # 出错时返回默认值
+
+    @staticmethod
+    def batch_extract_choices_with_llm(data_rows, num_processes=32, cache_dir='output_dir', use_single_thread=False):
+        """
+        并发处理多个预测
+        
+        Args:
+            data_rows: 包含预测和问题的数据行
+            num_processes: 要使用的并发进程数
+            cache_dir: 缓存结果的目录
+            use_single_thread: 是否强制使用单线程处理
+            
+        Returns:
+            list: 提取的选项列表
+        """
+        import os
+        import multiprocessing as mp
+        from functools import partial
+        import time
+        
+        # 确保缓存目录存在
+        os.makedirs(cache_dir, exist_ok=True)
+        
+        # 使用进程池来并发处理项目
+        results = []
+        total = len(data_rows)
+        
+        # 为每行创建简单的字典，只包含必要信息
+        row_dicts = []
+        for row in data_rows:
+            row_dicts.append({
+                'prediction': row['prediction'],
+                'question': row['question']
+            })
+        
+        # 如果指定了单线程或进程数为1，则使用单线程处理
+        if use_single_thread or num_processes <= 1:
+            print(f"使用单线程处理 {total} 个样本...")
+            results = []
+            start_time = time.time()
+            for i, row in enumerate(row_dicts):
+                result = MSRBenchDataset._process_single_item(row, cache_dir=cache_dir)
+                results.append(result)
+                if (i+1) % max(1, total//20) == 0:
+                    elapsed = time.time() - start_time
+                    remaining = (elapsed / (i+1)) * (total - (i+1))
+                    print(f"单线程进度: {i+1}/{total} ({(i+1)/total*100:.1f}%) - 已用时: {elapsed:.1f}秒, 剩余时间: {remaining:.1f}秒")
+            return results
+        
+        # 创建进程共享的处理函数
+        process_func = partial(MSRBenchDataset._process_single_item, cache_dir=cache_dir)
+        
+        # 对于Windows，需要使用if __name__=='__main__'来避免子进程递归创建
+        # 但在当前环境中，我们直接使用multiprocessing
+        print(f"启动 {num_processes} 个进程处理 {total} 个样本")
+        
+        try:
+            # 设置启动方法为 forkserver 或 spawn 以提高兼容性
+            if hasattr(mp, 'get_context'):
+                try:
+                    # 优先使用 forkserver，它在Linux上通常更可靠
+                    ctx = mp.get_context('forkserver')
+                    pool = ctx.Pool(processes=num_processes)
+                    print("使用 forkserver 方式启动进程池")
+                except ValueError:
+                    try:
+                        # 如果不支持 forkserver，则尝试 spawn
+                        ctx = mp.get_context('spawn')
+                        pool = ctx.Pool(processes=num_processes)
+                        print("使用 spawn 方式启动进程池")
+                    except ValueError:
+                        # 如果都不支持，则使用默认方式
+                        pool = mp.Pool(processes=num_processes)
+                        print("使用默认方式启动进程池")
+            else:
+                # 如果无法设置上下文，则使用默认池
+                pool = mp.Pool(processes=num_processes)
+                print("使用标准进程池")
+            
+            # 使用 imap 可以按顺序得到结果，同时支持并行处理
+            for i, result in enumerate(pool.imap(process_func, row_dicts, chunksize=max(1, total // (num_processes * 4)))):
+                results.append(result)
+                processed = i + 1
+                if processed % max(1, total//20) == 0:  # 每5%更新一次进度
+                    print(f"进度: {processed}/{total} ({processed/total*100:.1f}%)")
+            
+            pool.close()
+            pool.join()
+            
+        except Exception as e:
+            print(f"并行处理出错: {e}")
+            # 发生错误时，尝试单线程处理
+            print("尝试单线程处理...")
+            results = []
+            for i, row in enumerate(row_dicts):
+                result = MSRBenchDataset._process_single_item(row, cache_dir=cache_dir)
+                results.append(result)
+                if (i+1) % max(1, total//20) == 0:
+                    print(f"单线程进度: {i+1}/{total} ({(i+1)/total*100:.1f}%)")
+        
+        print(f"完成所有处理: {len(results)}/{total}")
+        return results
 
 class MSRBenchCircular(MSRBenchDataset):
     """
@@ -315,7 +672,7 @@ class MSRBenchCircular(MSRBenchDataset):
             cp4 = ['ABCD', 'BCDA', 'CDAB', 'DABC']
             new_rows = []
 
-            for _, row in data.iterrows():
+            for _, row in tqdm(data.iterrows(), desc="Processing data", total=len(data)):
                 question_text, options = self.extract_options_from_question(row['question'])
                 answer = row['answer'] if 'answer' in row else None
 
@@ -352,15 +709,30 @@ class MSRBenchCircular(MSRBenchDataset):
         else:
             return super(MSRBenchCircular, self).load_data(dataset)
     
-    def evaluate(self, eval_file, **judge_kwargs):
+    def evaluate(self, eval_file, cache_dir='output_dir', num_processes=32, use_single_thread=False, **judge_kwargs):
         """
-        简单直接的circular evaluation方法
-        直接提取预测的字母，然后检查每组题目是否都预测正确
+        评估方法，同时计算循环评估和传统评估的结果
+        
+        Args:
+            eval_file: 评估数据文件路径
+            cache_dir: 缓存目录路径
+            num_processes: 并行处理的进程数
+            use_single_thread: 是否使用单线程处理
+            **judge_kwargs: 其他参数
         """
         from ..smp.file import load, dump
         from .utils.multiple_choice import report_acc
         import pandas as pd
         import numpy as np
+        import os
+        import glob
+        
+        # 确保缓存目录存在
+        os.makedirs(cache_dir, exist_ok=True)
+        
+        # 检查缓存目录中已有的缓存文件数量
+        cache_files = glob.glob(os.path.join(cache_dir, "choice_cache_*.json"))
+        print(f"❗ 缓存目录 '{cache_dir}' 中已有 {len(cache_files)} 个缓存文件")
         
         suffix = eval_file.split('.')[-1]
         
@@ -374,14 +746,38 @@ class MSRBenchCircular(MSRBenchDataset):
         if 'g_index' not in data.columns:
             data['g_index'] = [int(x % 1e6) for x in data['index']]
             
-        # 使用已有的extract_single_choice_with_word_boundary函数提取选项
-        data['extracted_pred'] = data['prediction'].apply(self.extract_single_choice_with_word_boundary)
+        # 使用LLM提取选项，通过并发处理提高速度
+        print(f"❗ 使用 {num_processes} 个并行进程提取选项，缓存目录：{cache_dir}")
+        print(f"❗ {'使用单线程模式' if use_single_thread else '使用多进程模式'}")
+        
+        # 提取前统计缓存文件数量
+        cache_files_before = len(glob.glob(os.path.join(cache_dir, "choice_cache_*.json")))
+        
+        data['extracted_pred'] = MSRBenchDataset.batch_extract_choices_with_llm(
+            data.to_dict('records'), 
+            num_processes=num_processes,
+            cache_dir=cache_dir,
+            use_single_thread=use_single_thread
+        )
+        
+        # 提取后统计缓存文件数量
+        cache_files_after = len(glob.glob(os.path.join(cache_dir, "choice_cache_*.json")))
+        new_cache_files = cache_files_after - cache_files_before
+        
+        print(f"❗ 已完成 {len(data)} 个样本的选项提取")
+        print(f"❗ 新增 {new_cache_files} 个缓存文件，共有 {cache_files_after} 个缓存文件")
+        
+        # ----- 循环评估 (Circular Evaluation) -----
+        print(f"🔄 开始计算循环评估 (Circular Evaluation) 结果...")
         
         # 分组评估
         groups = data.groupby('g_index')
-        results = []
+        circular_results = []
         
-        for g_index, group in groups:
+        for g_index, group in tqdm(groups, desc="Processing groups", total=len(groups)):
+            # 验证 g_index 确实小于 10^6
+            assert g_index < 1e6, f"g_index {g_index} 不小于 10^6，数据有误"
+            
             # 创建基本结果行
             result_row = {
                 'index': int(g_index),  # 使用g_index作为主index
@@ -409,42 +805,96 @@ class MSRBenchCircular(MSRBenchDataset):
             result_row['hit'] = 1 if all_correct else 0
             result_row['log'] = '\n'.join(log_parts)
             
-            results.append(result_row)
+            circular_results.append(result_row)
             
-        # 创建结果DataFrame
-        result_df = pd.DataFrame(results)
+        # 创建循环评估结果DataFrame
+        circular_df = pd.DataFrame(circular_results)
         
-        # 保存详细结果
-        name_str = 'simple'
-        detailed_file = eval_file.replace(f'.{suffix}', f'_{name_str}_result.{suffix}')
-        dump(result_df, detailed_file)
+        # ----- 传统评估 (Vanilla Evaluation) -----
+        print(f"🔍 开始计算传统评估 (Vanilla Evaluation) 结果...")
         
-        # 计算准确率
-        acc = {}
-        acc['Overall'] = np.mean(result_df['hit'])
+        # 创建传统评估的结果列表
+        vanilla_results = []
+        
+        for g_index, group in tqdm(groups, desc="Processing original items", total=len(groups)):
+            # 验证 g_index 确实小于 10^6
+            assert g_index < 1e6, f"g_index {g_index} 不小于 10^6，数据有误"
+            
+            # 找到组内index最小的行（原始题目）
+            original_row = group.loc[group['index'].idxmin()]
+            
+            # 创建结果行
+            result_row = {
+                'index': int(g_index),  # 使用g_index作为主index
+                'category': original_row['category'],
+                'answer': original_row['answer'],
+                'prediction': original_row['prediction'],
+                'extracted_pred': original_row['extracted_pred'],
+                'hit': 1 if original_row['extracted_pred'] == original_row['answer'] else 0,
+                'log': f"Index {original_row['index']}: 预测={original_row['extracted_pred']}, 答案={original_row['answer']}"
+            }
+            
+            vanilla_results.append(result_row)
+        
+        # 创建传统评估结果DataFrame
+        vanilla_df = pd.DataFrame(vanilla_results)
+        
+        # ----- 保存结果 -----
+        # 保存循环评估详细结果
+        circular_detailed_file = eval_file.replace(f'.{suffix}', f'_circular_result.{suffix}')
+        dump(circular_df, circular_detailed_file)
+        
+        # 保存传统评估详细结果
+        vanilla_detailed_file = eval_file.replace(f'.{suffix}', f'_vanilla_result.{suffix}')
+        dump(vanilla_df, vanilla_detailed_file)
+        
+        # 计算循环评估准确率
+        circular_acc = {}
+        circular_acc['Overall'] = np.mean(circular_df['hit'])
+        
+        # 计算传统评估准确率
+        vanilla_acc = {}
+        vanilla_acc['Overall'] = np.mean(vanilla_df['hit'])
         
         # 按类别计算准确率
-        if 'category' in result_df.columns:
-            categories = result_df['category'].unique()
+        if 'category' in circular_df.columns:
+            categories = circular_df['category'].unique()
             for category in categories:
-                cat_data = result_df[result_df['category'] == category]
-                acc[category] = np.mean(cat_data['hit'])
+                # 循环评估
+                circ_cat_data = circular_df[circular_df['category'] == category]
+                circular_acc[category] = np.mean(circ_cat_data['hit'])
                 
-        # 创建简单的报告格式
-        acc_df = pd.DataFrame([acc])
+                # 传统评估
+                van_cat_data = vanilla_df[vanilla_df['category'] == category]
+                vanilla_acc[category] = np.mean(van_cat_data['hit'])
+        
+        # 创建报告格式
+        combined_acc = {}
+        for key in circular_acc.keys():
+            combined_acc[key] = {
+                'Circular': circular_acc[key],
+                'Vanilla': vanilla_acc[key]
+            }
+        
+        combined_df = pd.DataFrame(combined_acc).T
+        combined_df.index.name = 'Category'
         
         # 保存准确率结果
-        score_file = eval_file.replace(f'.{suffix}', f'_{name_str}_acc.csv')
-        dump(acc_df, score_file)
+        score_file = eval_file.replace(f'.{suffix}', f'_combined_acc.csv')
+        dump(combined_df, score_file)
         
-        print(f"MSR_Bench Circular 评测结果：")
-        print(f"总样本数: {len(result_df)}")
-        print(f"正确样本数: {sum(result_df['hit'])}")
-        print(f"准确率: {acc['Overall']:.2%}")
+        # 输出最终结果
+        print(f"\n====== MSR_Bench 评测结果 ======")
+        print(f"总样本组数: {len(circular_df)}")
         
-        # 输出每个类别的准确率
+        print(f"\n📊 传统评估 (Vanilla) - 单题正确率: {vanilla_acc['Overall']:.2%}")
+        print(f"📊 循环评估 (Circular) - 全题组正确率: {circular_acc['Overall']:.2%}")
+        
+        print(f"\n📊 各类别准确率:")
         for cat in categories:
-            cat_acc = acc[cat]
-            print(f"{cat}: {cat_acc:.2%}")
-            
-        return acc_df 
+            print(f"{cat}:")
+            print(f"  传统评估: {vanilla_acc[cat]:.2%}")
+            print(f"  循环评估: {circular_acc[cat]:.2%}")
+        
+        # 返回两种评估结果的DataFrame
+        return combined_df 

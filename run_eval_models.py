@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
+
+# python run.py --model  Claude3-7V_Sonnet_Internal Claude3-7V_Sonnet_Internal_thinking GeminiPro2-5-0506 DoubaoVL --data MSR_Bench_Circular  --reuse       
+
+# python run.py --model  Claude3-7V_Sonnet_Internal Claude3-7V_Sonnet_Internal_thinking  DoubaoVL --data MSR_Bench_Circular  --reuse   
+
+
 import os
 import sys
 import subprocess
@@ -17,6 +24,10 @@ DATASET = "MSR_Bench"
 DATASET = "MSR_Bench MMBench_DEV_EN_V11 MSR_Bench_Circular"
 # DATASET = "MSR_Bench MSR_Bench_Circular"
 # DATASET = "MSR_Bench_Circular"
+DATASET = "MMBench_DEV_EN_V11 MSR_Bench_Circular"
+DATASET = "MMBench_DEV_EN_V11"
+DATASET = "MSR_Bench"
+DATASET = "MSR_Bench_Circular"
 
 # 解析命令行参数
 def parse_args():
@@ -27,7 +38,7 @@ def parse_args():
 
 # 基础命令模板
 CMD_TEMPLATE = (
-    f"cd {PROJECT_DIR} && conda activate ENV_NAME && python run.py --data {DATASET} --model MODEL_NAME --verbose --reuse"
+    f"cd {PROJECT_DIR} && conda activate ENV_NAME && python run.py --data {DATASET} --model MODEL_NAME --verbose"
 )
 
 TORCH_RUN_CMD_TEMPLATE = (
@@ -37,16 +48,13 @@ TORCH_RUN_CMD_TEMPLATE = (
 TORCH_RUN_MODELS = [
     "NVILA-8B",
     "NVILA-15B",
+    'llava_onevision_qwen2_72b_ov'
 ]
 
 api_models = [
-    # "GPT4o_20240806",
-    # "gpt-4.1-2025-04-14",
-    # "GPT4.5"
-    # "Claude3-7V_Sonnet_Internal",
-    # "GeminiPro2-5", # 需要开代理
-    # "GeminiFlash2-thinking",
-    # "GeminiFlash2",
+    "Claude3-7V_Sonnet_Internal",
+    "Claude3-7V_Sonnet_Internal_thinking",
+    "GeminiPro2-5-0506", # 需要开代理
     "DoubaoVL",
 ]
     
@@ -83,7 +91,7 @@ MODELS = [
     "llava_onevision_qwen2_72b_ov",
 
     # 5. Efficient-Large-Model/VILA 系列
-    # "NVILA-8B", # 正在下载path
+    "NVILA-8B",
     # "NVILA-15B", # 正在下载path
     # "Llama-3-VILA1.5-8b",
     # "VILA1.5-13b",
@@ -98,27 +106,34 @@ MODELS = [
     "deepseek_vl2",
        
     # API models
-    # *api_models,
+    *api_models,
 ]
 
-MODELS = [    "InternVL3-14B","llava_onevision_qwen2_0.5b_ov","llava_onevision_qwen2_72b_ov"
-]
+# MODELS = [    "InternVL3-14B","llava_onevision_qwen2_0.5b_ov","llava_onevision_qwen2_72b_ov"
+# ]
 
-MODELS = [    
-    "NVILA-8B", # 正在下载path
-    "NVILA-15B", # 正在下载path"
-]
+# MODELS = [    
+#     # "NVILA-8B", # 正在下载path
+#     "NVILA-15B", # 正在下载path"
+# ]
 # MODELS = [    
 #     "llava_onevision_qwen2_0.5b_ov"
+# ]
+# MODELS = [    
+#     "llava_onevision_qwen2_72b_ov"
 # ]
 
 
     
-MODELS = [   *api_models
-]
+# MODELS = [   *api_models
+# ]
 
-print(f"python scripts/summarize.py --model {' '.join(MODELS)} --data {DATASET}")
-# python scripts/summarize.py --model InternVL2_5-1B InternVL2_5-2B InternVL2_5-4B InternVL2_5-8B InternVL2_5-26B InternVL2_5-38B InternVL2_5-78B InternVL3-1B InternVL3-2B InternVL3-8B InternVL3-9B InternVL3-14B InternVL3-38B InternVL3-78B Qwen2.5-VL-3B-Instruct Qwen2.5-VL-7B-Instruct Qwen2.5-VL-32B-Instruct Qwen2.5-VL-72B-Instruct llava_onevision_qwen2_0.5b_ov llava_onevision_qwen2_7b_ov llava_onevision_qwen2_72b_ov Llama-3.2-11B-Vision-Instruct deepseek_vl2_tiny deepseek_vl2_small deepseek_vl2 \ gpt-4.1-2025-04-14 DoubaoVL --data MMBench_DEV_EN_V11 MSR_Bench MSR_Bench_Circular 
+# print(f"python scripts/summarize.py --model {' '.join(MODELS)} --data {DATASET}")
+# # eval 的命令
+# print(f"python run.py --model {' '.join(MODELS)} --data {DATASET} --mode eval --reuse")
+
+# raise Exception("stop")
+# python scripts/summarize.py --model InternVL2_5-1B InternVL2_5-2B InternVL2_5-4B InternVL2_5-8B InternVL2_5-26B InternVL2_5-38B InternVL2_5-78B InternVL3-1B InternVL3-2B InternVL3-8B InternVL3-9B InternVL3-14B InternVL3-38B InternVL3-78B Qwen2.5-VL-3B-Instruct Qwen2.5-VL-7B-Instruct Qwen2.5-VL-32B-Instruct Qwen2.5-VL-72B-Instruct llava_onevision_qwen2_0.5b_ov llava_onevision_qwen2_7b_ov llava_onevision_qwen2_72b_ov Llama-3.2-11B-Vision-Instruct deepseek_vl2_tiny deepseek_vl2_small deepseek_vl2 NVILA-8B NVILA-15B gpt-4.1-2025-04-14 DoubaoVL --data MMBench_DEV_EN_V11 MSR_Bench MSR_Bench_Circular 
 
 # python scripts/summarize.py --model InternVL2_5-1B InternVL2_5-2B InternVL2_5-4B InternVL2_5-8B InternVL2_5-26B InternVL2_5-38B InternVL2_5-78B  --data MMBench_DEV_EN_V11 MSR_Bench MSR_Bench_Circular 
 
@@ -289,25 +304,41 @@ def main():
             nproc_per_node = total_gpus // gpu_count
             # 确保至少有1个进程
             nproc_per_node = max(1, nproc_per_node)
-            cmd = TORCH_RUN_CMD_TEMPLATE.replace("ENV_NAME", env).replace("MODEL_NAME", model).replace("NUMBER_OF_PROC", str(nproc_per_node))
-            print(f"提交torchrun任务: {model} (环境: {env}, 总GPU: {total_gpus}, nproc-per-node: {nproc_per_node})")
-            # 使用固定的8张卡
-            gpu_count = total_gpus
+            
+            # 对于torch run模型，将数据集按空格分开，为每个数据集提交单独的任务
+            datasets = DATASET.split()
+            for dataset in datasets:
+                dataset_cmd = TORCH_RUN_CMD_TEMPLATE.replace("ENV_NAME", env).replace("MODEL_NAME", model).replace("NUMBER_OF_PROC", str(nproc_per_node))
+                # 替换模板中的数据集部分
+                dataset_cmd = dataset_cmd.replace(f"--data {DATASET}", f"--data {dataset}")
+                print(f"提交torchrun任务: {model} (环境: {env}, 总GPU: {total_gpus}, nproc-per-node: {nproc_per_node}, 数据集: {dataset})")
+                
+                try:
+                    random.seed(idx)
+                    queue_name = random.choice(queue_list)
+                    print(f"使用队列: {queue_name}")
+                    # 替换点号为下划线，确保符合任务名称规范
+                    sanitized_model_name = model.replace(".", "_")
+                    task_name = f"eval_{sanitized_model_name}_{dataset}"
+                    py_volcrun(dataset_cmd, num_gpus=total_gpus, queue_name=queue_name, task_name=task_name)
+                except Exception as e:
+                    print(f"提交任务失败: {model} 数据集 {dataset}, 错误: {e}")
+                time.sleep(2)
         else:
             cmd = CMD_TEMPLATE.replace("ENV_NAME", env).replace("MODEL_NAME", model)
             print(f"提交普通任务: {model} (环境: {env}, GPU: {gpu_count})")
-        
-        # 直接用python版本的volcrun
-        try:
-            random.seed(idx)
-            queue_name = random.choice(queue_list)
-            print(f"使用队列: {queue_name}")
-            # 替换点号为下划线，确保符合任务名称规范
-            sanitized_model_name = model.replace(".", "_")
-            py_volcrun(cmd, num_gpus=gpu_count, queue_name=queue_name, task_name=f"eval_{sanitized_model_name}")
-        except Exception as e:
-            print(f"提交任务失败: {model}, 错误: {e}")
-        time.sleep(2)
+            
+            # 直接用python版本的volcrun
+            try:
+                random.seed(idx)
+                queue_name = random.choice(queue_list)
+                print(f"使用队列: {queue_name}")
+                # 替换点号为下划线，确保符合任务名称规范
+                sanitized_model_name = model.replace(".", "_")
+                py_volcrun(cmd, num_gpus=gpu_count, queue_name=queue_name, task_name=f"eval_{sanitized_model_name}")
+            except Exception as e:
+                print(f"提交任务失败: {model}, 错误: {e}")
+            time.sleep(2)
     print("所有评测任务已提交")
 
 if __name__ == "__main__":

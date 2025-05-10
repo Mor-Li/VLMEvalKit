@@ -753,17 +753,17 @@ class MSRBenchCircular(MSRBenchDataset):
         # 提取前统计缓存文件数量
         cache_files_before = len(glob.glob(os.path.join(cache_dir, "choice_cache_*.json")))
         
-        # data['extracted_pred'] = MSRBenchDataset.batch_extract_choices_with_llm(
-        #     data.to_dict('records'), 
-        #     num_processes=num_processes,
-        #     cache_dir=cache_dir,
-        #     use_single_thread=use_single_thread
-        # )
+        data['extracted_pred'] = MSRBenchDataset.batch_extract_choices_with_llm(
+            data.to_dict('records'), 
+            num_processes=num_processes,
+            cache_dir=cache_dir,
+            use_single_thread=use_single_thread
+        )
         
         
         # extracted_pred_exactmatch
         data['extracted_pred'] = data['prediction'].apply(MSRBenchDataset.extract_single_choice_with_word_boundary)
-        import ipdb; ipdb.set_trace()
+        # import ipdb; ipdb.set_trace()
         
         # 提取后统计缓存文件数量
         cache_files_after = len(glob.glob(os.path.join(cache_dir, "choice_cache_*.json")))

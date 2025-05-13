@@ -398,7 +398,8 @@ api_models = {
         retry=10,
     ),
     # CongRong
-    "CloudWalk": partial(CWWrapper, model="cw-congrong-v1.5", temperature=0, retry=10),
+    "CongRong-v1.5": partial(CWWrapper, model="cw-congrong-v1.5", temperature=0, retry=10),
+    "CongRong-v2.0": partial(CWWrapper, model="cw-congrong-v2.0", temperature=0, retry=10),
     # SenseNova
     "SenseNova-V6-Pro": partial(
         SenseChatVisionAPI, model="SenseNova-V6-Pro", temperature=0, retry=10
@@ -465,6 +466,9 @@ api_models = {
     # doubao_vl
     "DoubaoVL": partial(
         DoubaoVL, model="Doubao-1.5-vision-pro", temperature=0, retry=10, verbose=False
+    ),
+    "Seed1.5-VL": partial(
+        DoubaoVL, model="doubao-1-5-thinking-vision-pro-250428", temperature=0, retry=10, verbose=False
     ),
     # Shopee MUG-U
     'MUG-U-7B': partial(

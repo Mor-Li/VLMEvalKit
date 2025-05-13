@@ -762,7 +762,7 @@ class MSRBenchCircular(MSRBenchDataset):
         
         
         # extracted_pred_exactmatch
-        data['extracted_pred'] = data['prediction'].apply(MSRBenchDataset.extract_single_choice_with_word_boundary)
+        # data['extracted_pred'] = data['prediction'].apply(MSRBenchDataset.extract_single_choice_with_word_boundary)
         # import ipdb; ipdb.set_trace()
         
         # 提取后统计缓存文件数量

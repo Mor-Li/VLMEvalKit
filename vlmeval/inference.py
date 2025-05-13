@@ -3,6 +3,9 @@ import torch.distributed as dist
 from vlmeval.config import supported_VLM
 from vlmeval.utils import track_progress_rich
 from vlmeval.smp import *
+import time
+
+logger = get_logger("Inference")
 
 FAIL_MSG = 'Failed to obtain answer via API.'
 
@@ -189,13 +192,50 @@ def infer_data_job(
         dist.barrier()
 
     if rank == 0:
-        data_all = {}
-        for i in range(world_size):
-            data_all.update(load(tmpl.format(i)))
-
         data = dataset.data
-        for x in data['index']:
-            assert x in data_all
+        # Add retry mechanism to handle missing indices
+        # Retry up to 3 times, waiting 60 seconds between each attempt to allow processes to finish
+        max_retries = 3
+        retry_count = 0
+        # Initialize data_all outside the loop
+        data_all = {}
+        
+        while retry_count < max_retries:
+            # Reload all data files on each retry to get the latest results
+            data_all = {}  # Reset data_all before loading new data
+            for i in range(world_size):
+                data_all.update(load(tmpl.format(i)))
+                
+            # Check for missing indices
+            missing_indices = []
+            for x in data['index']:
+                if x not in data_all:
+                    missing_indices.append(x)
+
+            # If there are no missing indices, exit the loop
+            if not missing_indices:
+                break
+
+            # If not the last attempt, log warning and wait before retrying
+            if retry_count < max_retries - 1:
+                logger.warning(
+                    f"[Rank 0] Missing {len(missing_indices)} indices in combined results. "
+                    f"Waiting 60 seconds and retrying... (Attempt {retry_count+1}/{max_retries})")
+                logger.warning(
+                    f"[Rank 0] Missing indices: {missing_indices[:10]}{'...' if len(missing_indices) > 10 else ''}")
+                time.sleep(60)  # Wait for 60 seconds to allow other processes to complete
+
+            retry_count += 1
+
+        # If there are still missing indices after all retries, raise an error
+        if missing_indices:
+            missing_str = ', '.join(map(str, missing_indices[:20]))
+            if len(missing_indices) > 20:
+                missing_str += f"... (and {len(missing_indices) - 20} more)"
+            error_msg = f"After {max_retries} retries, still missing {len(missing_indices)} indices: {missing_str}"
+            logger.error(f"[Rank 0] ERROR: {error_msg}")
+            assert False, error_msg
+
         data['prediction'] = [str(data_all[x]) for x in data['index']]
         if 'image' in data:
             data.pop('image')

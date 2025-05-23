@@ -36,7 +36,7 @@ DATASET = "MSR_Bench MMBench_DEV_EN_V11 MSR_Bench_Circular"
 DATASET = "MMBench_DEV_EN_V11 MSR_Bench_Circular"
 DATASET = "MMBench_DEV_EN_V11"
 DATASET = "MSR_Bench"
-DATASET = "MSR_Bench_Circular"
+# DATASET = "MSR_Bench_Circular"
 
 # 解析命令行参数
 def parse_args():

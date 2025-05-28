@@ -57,7 +57,8 @@ TORCH_RUN_CMD_TEMPLATE = (
 TORCH_RUN_MODELS = [
     "NVILA-8B",
     "NVILA-15B",
-    'llava_onevision_qwen2_72b_ov'
+    'llava_onevision_qwen2_72b_ov',
+    "InternVL3-1B",
 ]
 
 api_models = [

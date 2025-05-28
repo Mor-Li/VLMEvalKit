@@ -2,18 +2,18 @@
 # -*- coding: utf-8 -*-
 
 
-# python run.py --model  Claude3-7V_Sonnet_Internal Claude3-7V_Sonnet_Internal_thinking GeminiPro2-5-0506 DoubaoVL --data MSR_Bench_Circular  --reuse       
+# python run.py --model  Claude3-7V_Sonnet_Internal Claude3-7V_Sonnet_Internal_thinking GeminiPro2-5-0506 DoubaoVL --data MMSI_Bench_Circular  --reuse       
 
-# python run.py --model  Claude3-7V_Sonnet_Internal Claude3-7V_Sonnet_Internal_thinking NVILA-8B  NVILA-15B --data MSR_Bench_Circular  --reuse
+# python run.py --model  Claude3-7V_Sonnet_Internal Claude3-7V_Sonnet_Internal_thinking NVILA-8B  NVILA-15B --data MMSI_Bench_Circular  --reuse
    
-# python run.py --model NVILA-8B --data MSR_Bench_Circular  --reuse   
+# python run.py --model NVILA-8B --data MMSI_Bench_Circular  --reuse   
 
 # 传统的方式的提取的答案的方法
-# python scripts/summarize.py --model InternVL2_5-1B InternVL2_5-2B InternVL2_5-4B InternVL2_5-8B InternVL2_5-26B InternVL2_5-38B InternVL2_5-78B InternVL3-1B InternVL3-2B InternVL3-8B InternVL3-9B InternVL3-14B InternVL3-38B InternVL3-78B Qwen2.5-VL-3B-Instruct Qwen2.5-VL-7B-Instruct Qwen2.5-VL-32B-Instruct Qwen2.5-VL-72B-Instruct llava_onevision_qwen2_0.5b_ov llava_onevision_qwen2_7b_ov llava_onevision_qwen2_72b_ov Llama-3.2-11B-Vision-Instruct deepseek_vl2_tiny deepseek_vl2_small deepseek_vl2 NVILA-8B NVILA-15B  --data MSR_Bench_Circular 
+# python scripts/summarize.py --model InternVL2_5-1B InternVL2_5-2B InternVL2_5-4B InternVL2_5-8B InternVL2_5-26B InternVL2_5-38B InternVL2_5-78B InternVL3-1B InternVL3-2B InternVL3-8B InternVL3-9B InternVL3-14B InternVL3-38B InternVL3-78B Qwen2.5-VL-3B-Instruct Qwen2.5-VL-7B-Instruct Qwen2.5-VL-32B-Instruct Qwen2.5-VL-72B-Instruct llava_onevision_qwen2_0.5b_ov llava_onevision_qwen2_7b_ov llava_onevision_qwen2_72b_ov Llama-3.2-11B-Vision-Instruct deepseek_vl2_tiny deepseek_vl2_small deepseek_vl2 NVILA-8B NVILA-15B  --data MMSI_Bench_Circular 
 
 # 用api的提取出来的答案的api的model 对于claude 和gemini
 
-# python scripts/summarize.py --model Claude3-7V_Sonnet_Internal Claude3-7V_Sonnet_Internal_thinking NVILA-8B NVILA-15B --data MSR_Bench_Circular 
+# python scripts/summarize.py --model Claude3-7V_Sonnet_Internal Claude3-7V_Sonnet_Internal_thinking NVILA-8B NVILA-15B --data MMSI_Bench_Circular 
 
 
 import os
@@ -28,15 +28,15 @@ import random
 PROJECT_DIR = "/fs-computility/mllm1/limo/workspace/VLMEvalKit"
 
 # 要评测的数据集
-DATASET = "MSR_Bench"
+DATASET = "MMSI_Bench"
 # DATASET = "MMBench_DEV_EN_V11"
-DATASET = "MSR_Bench MMBench_DEV_EN_V11 MSR_Bench_Circular"
-# DATASET = "MSR_Bench MSR_Bench_Circular"
-# DATASET = "MSR_Bench_Circular"
-DATASET = "MMBench_DEV_EN_V11 MSR_Bench_Circular"
+DATASET = "MMSI_Bench MMBench_DEV_EN_V11 MMSI_Bench_Circular"
+# DATASET = "MMSI_Bench MMSI_Bench_Circular"
+# DATASET = "MMSI_Bench_Circular"
+DATASET = "MMBench_DEV_EN_V11 MMSI_Bench_Circular"
 DATASET = "MMBench_DEV_EN_V11"
-DATASET = "MSR_Bench"
-# DATASET = "MSR_Bench_Circular"
+DATASET = "MMSI_Bench"
+# DATASET = "MMSI_Bench_Circular"
 
 # 解析命令行参数
 def parse_args():
@@ -133,6 +133,11 @@ MODELS = [
 # ]
 
 
+
+MODELS = [    
+    "InternVL3-1B",
+]
+
     
 # MODELS = [   *api_models
 # ]
@@ -142,9 +147,9 @@ MODELS = [
 # print(f"python run.py --model {' '.join(MODELS)} --data {DATASET} --mode eval --reuse")
 
 # raise Exception("stop")
-# python scripts/summarize.py --model InternVL2_5-1B InternVL2_5-2B InternVL2_5-4B InternVL2_5-8B InternVL2_5-26B InternVL2_5-38B InternVL2_5-78B InternVL3-1B InternVL3-2B InternVL3-8B InternVL3-9B InternVL3-14B InternVL3-38B InternVL3-78B Qwen2.5-VL-3B-Instruct Qwen2.5-VL-7B-Instruct Qwen2.5-VL-32B-Instruct Qwen2.5-VL-72B-Instruct llava_onevision_qwen2_0.5b_ov llava_onevision_qwen2_7b_ov llava_onevision_qwen2_72b_ov Llama-3.2-11B-Vision-Instruct deepseek_vl2_tiny deepseek_vl2_small deepseek_vl2 NVILA-8B NVILA-15B gpt-4.1-2025-04-14 DoubaoVL --data MMBench_DEV_EN_V11 MSR_Bench MSR_Bench_Circular 
+# python scripts/summarize.py --model InternVL2_5-1B InternVL2_5-2B InternVL2_5-4B InternVL2_5-8B InternVL2_5-26B InternVL2_5-38B InternVL2_5-78B InternVL3-1B InternVL3-2B InternVL3-8B InternVL3-9B InternVL3-14B InternVL3-38B InternVL3-78B Qwen2.5-VL-3B-Instruct Qwen2.5-VL-7B-Instruct Qwen2.5-VL-32B-Instruct Qwen2.5-VL-72B-Instruct llava_onevision_qwen2_0.5b_ov llava_onevision_qwen2_7b_ov llava_onevision_qwen2_72b_ov Llama-3.2-11B-Vision-Instruct deepseek_vl2_tiny deepseek_vl2_small deepseek_vl2 NVILA-8B NVILA-15B gpt-4.1-2025-04-14 DoubaoVL --data MMBench_DEV_EN_V11 MMSI_Bench MMSI_Bench_Circular 
 
-# python scripts/summarize.py --model InternVL2_5-1B InternVL2_5-2B InternVL2_5-4B InternVL2_5-8B InternVL2_5-26B InternVL2_5-38B InternVL2_5-78B  --data MMBench_DEV_EN_V11 MSR_Bench MSR_Bench_Circular 
+# python scripts/summarize.py --model InternVL2_5-1B InternVL2_5-2B InternVL2_5-4B InternVL2_5-8B InternVL2_5-26B InternVL2_5-38B InternVL2_5-78B  --data MMBench_DEV_EN_V11 MMSI_Bench MMSI_Bench_Circular 
 
 # 检查映射文件是否存在
 def check_map_files():

@@ -7,7 +7,7 @@ import gradio as gr
 import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
-from vlmeval.dataset.msr_bench import MSRBenchDataset
+from vlmeval.dataset.mmsi_bench import MSRBenchDataset
 
 class MSRBenchComparer:
     def __init__(self, model_names):

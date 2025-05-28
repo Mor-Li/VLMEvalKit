@@ -63,7 +63,7 @@ from .GUI.screenspot import ScreenSpot
 from .GUI.screenspot_v2 import ScreenSpotV2
 from .GUI.screenspot_pro import ScreenSpot_Pro
 from .mmifeval import MMIFEval
-from .msr_bench import MSRBenchDataset, MSRBenchCircular
+from .mmsi_bench import MMSIBenchDataset, MMSIBenchCircular
 
 
 class ConcatDataset(ImageBaseDataset):
@@ -165,7 +165,7 @@ IMAGE_DATASET = [
     LEGO, MMSci_Captioning, Physics_yale, ScreenSpot_Pro, ScreenSpot, ScreenSpotV2,
     MMIFEval, Spatial457, VisuLogic, CVBench,
     CMMU_MCQ, PathVQA_VAL, PathVQA_TEST, PathMMU_VAL, PathMMU_TEST, TDBench, TDBenchGrounding,
-    MicroVQA, MicroBench, CharXiv, OmniMedVQA, WildDocBenchmark, MSEarthMCQ, OCR_Reasoning, MSRBenchDataset, MSRBenchCircular
+    MicroVQA, MicroBench, CharXiv, OmniMedVQA, WildDocBenchmark, MSEarthMCQ, OCR_Reasoning, MMSIBenchDataset, MMSIBenchCircular
 ]
 
 

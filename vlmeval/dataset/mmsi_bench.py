@@ -12,38 +12,34 @@ from ..smp import LMUDataRoot, file_size, load, dump, decode_base64_to_image_fil
 import string
 import glob
 
-class MSRBenchDataset(ImageMCQDataset):
+class MMSIBenchDataset(ImageMCQDataset):
     """
-    MSR Bench Dataset class for multiple-choice questions with multiple images.
+    MMSI Bench Dataset class for multiple-choice questions with multiple images.
     支持多图片的多选题评测数据集，图片以JSON数组格式存储在image字段中。
     """
     TYPE = 'MCQ'
     
-    # 使用本地TSV文件路径，不进行网络下载
-    # MSR_BENCH_TSV = '/fs-computility/mllm1/shared/LMUData/msr_bench_fanal_version_5_5_cat_option_to_qs.tsv'
-    MSR_BENCH_TSV = '/fs-computility/mllm1/shared/LMUData/msr_bench_fanal_version_5_5_cat_option_to_qs_fixed.tsv'
-    # MSR_BENCH_TSV = '/fs-computility/mllm1/shared/LMUData/msr_bench_en_3_sample_from_fanal_version_cat_option_to_qs.tsv'
-    # MSR_BENCH_TSV = '/fs-computility/mllm1/shared/LMUData/msr_bench_en_3_sample_from_fanal_version_cat_option_to_qs.tsv'
-    
+    MMSI_BENCH_TSV = '/fs-computility/mllm1/shared/LMUData/MMSI_bench_fanal_version_5_5_cat_option_to_qs_fixed.tsv'
+
     # DATASET_URL = {
-    #     'MSR_Bench': 'file:///fs-computility/mllm1/shared/LMUData/msr_bench_cat_option_to_qs.tsv'
+    #     'MMSI_Bench': 'file:///fs-computility/mllm1/shared/LMUData/MMSI_bench_cat_option_to_qs.tsv'
     # }
     DATASET_MD5 = {
-        'MSR_Bench': ''  # 如果有MD5校验，可以在这里添加
+        'MMSI_Bench': ''  # 如果有MD5校验，可以在这里添加
     }
     
     @classmethod
     def supported_datasets(cls):
-        return ['MSR_Bench']
+        return ['MMSI_Bench']
     
     def load_data(self, dataset):
         """
         重写load_data方法，直接加载本地TSV文件
         """
-        if dataset == 'MSR_Bench':
-            tsv_path = self.__class__.MSR_BENCH_TSV
+        if dataset == 'MMSI_Bench':
+            tsv_path = self.__class__.MMSI_BENCH_TSV
             if not osp.exists(tsv_path):
-                raise FileNotFoundError(f"MSR_Bench TSV文件不存在: {tsv_path}")
+                raise FileNotFoundError(f"MMSI_Bench TSV文件不存在: {tsv_path}")
             
             data = pd.read_csv(tsv_path, sep='\t')
             # 确保必要的列存在
@@ -203,7 +199,7 @@ class MSRBenchDataset(ImageMCQDataset):
             total += 1
             
         accuracy = correct / total if total > 0 else 0
-        print("MSR_Bench 评测结果：")
+        print("MMSI_Bench 评测结果：")
         print(f"总样本数: {total}")
         print(f"正确样本数: {correct}")
         print(f"准确率: {accuracy:.2%}")
@@ -272,7 +268,7 @@ class MSRBenchDataset(ImageMCQDataset):
         Args:
             pred (str): The prediction text to extract a choice from
             question (str, optional): The question text containing options. Default is None.
-            cache_dir (str, optional): Directory for caching results. Default is 'output_dir'.
+            cache_dir (str, optional): Directory for caching results. Default is '.cache'.
         
         Returns:
             str: The extracted choice (A, B, C, D, or Z for no match)
@@ -285,7 +281,7 @@ class MSRBenchDataset(ImageMCQDataset):
         
         # Setup cache directory
         if cache_dir is None:
-            cache_dir = os.environ.get('OUTPUT_DIR', 'output_dir')
+            cache_dir = os.environ.get('.cache', '.cache')
         
         os.makedirs(cache_dir, exist_ok=True)
         
@@ -381,7 +377,7 @@ class MSRBenchDataset(ImageMCQDataset):
         return "Z"
 
     @staticmethod
-    def _process_single_item(row_dict, cache_dir='output_dir'):
+    def _process_single_item(row_dict, cache_dir='.cache'):
         """
         处理单个项目的工作函数，用于并行处理
         
@@ -518,7 +514,7 @@ class MSRBenchDataset(ImageMCQDataset):
             return "Z"  # 出错时返回默认值
 
     @staticmethod
-    def batch_extract_choices_with_llm(data_rows, num_processes=32, cache_dir='output_dir', use_single_thread=False):
+    def batch_extract_choices_with_llm(data_rows, num_processes=32, cache_dir='.cache', use_single_thread=False):
         """
         并发处理多个预测
         
@@ -557,7 +553,7 @@ class MSRBenchDataset(ImageMCQDataset):
             results = []
             start_time = time.time()
             for i, row in enumerate(row_dicts):
-                result = MSRBenchDataset._process_single_item(row, cache_dir=cache_dir)
+                result = MMSIBenchDataset._process_single_item(row, cache_dir=cache_dir)
                 results.append(result)
                 if (i+1) % max(1, total//20) == 0:
                     elapsed = time.time() - start_time
@@ -566,7 +562,7 @@ class MSRBenchDataset(ImageMCQDataset):
             return results
         
         # 创建进程共享的处理函数
-        process_func = partial(MSRBenchDataset._process_single_item, cache_dir=cache_dir)
+        process_func = partial(MMSIBenchDataset._process_single_item, cache_dir=cache_dir)
         
         # 对于Windows，需要使用if __name__=='__main__'来避免子进程递归创建
         # 但在当前环境中，我们直接使用multiprocessing
@@ -611,7 +607,7 @@ class MSRBenchDataset(ImageMCQDataset):
             print("尝试单线程处理...")
             results = []
             for i, row in enumerate(row_dicts):
-                result = MSRBenchDataset._process_single_item(row, cache_dir=cache_dir)
+                result = MMSIBenchDataset._process_single_item(row, cache_dir=cache_dir)
                 results.append(result)
                 if (i+1) % max(1, total//20) == 0:
                     print(f"单线程进度: {i+1}/{total} ({(i+1)/total*100:.1f}%)")
@@ -619,9 +615,9 @@ class MSRBenchDataset(ImageMCQDataset):
         print(f"完成所有处理: {len(results)}/{total}")
         return results
 
-class MSRBenchCircular(MSRBenchDataset):
+class MMSIBenchCircular(MMSIBenchDataset):
     """
-    MSR Bench Circular Dataset class.
+    MMSI Bench Circular Dataset class.
     Uses circular evaluation method for multiple-choice questions.
     选项嵌入在question字段中，使用circular evaluation方法进行评估。
     """
@@ -629,7 +625,7 @@ class MSRBenchCircular(MSRBenchDataset):
     
     @classmethod
     def supported_datasets(cls):
-        return ['MSR_Bench_Circular']
+        return ['MMSI_Bench_Circular']
     
     def extract_options_from_question(self, question):
         """
@@ -661,10 +657,10 @@ class MSRBenchCircular(MSRBenchDataset):
         """
         加载数据并自动生成 circular 变体，每题4种选项顺序。
         """
-        if dataset == 'MSR_Bench_Circular':
-            tsv_path = MSRBenchDataset.MSR_BENCH_TSV
+        if dataset == 'MMSI_Bench_Circular':
+            tsv_path = MMSIBenchDataset.MMSI_BENCH_TSV
             if not osp.exists(tsv_path):
-                raise FileNotFoundError(f"MSR_Bench TSV文件不存在: {tsv_path}")
+                raise FileNotFoundError(f"MMSI_Bench TSV文件不存在: {tsv_path}")
 
             data = pd.read_csv(tsv_path, sep='\t')
             assert 'index' in data.columns, "TSV文件缺少'index'列"
@@ -708,9 +704,9 @@ class MSRBenchCircular(MSRBenchDataset):
             return new_data
 
         else:
-            return super(MSRBenchCircular, self).load_data(dataset)
+            return super(MMSIBenchCircular, self).load_data(dataset)
     
-    def evaluate(self, eval_file, cache_dir='output_dir', num_processes=32, use_single_thread=False, **judge_kwargs):
+    def evaluate(self, eval_file, cache_dir='.cache', num_processes=32, use_single_thread=False, **judge_kwargs):
         """
         评估方法，同时计算循环评估和传统评估的结果
         
@@ -754,17 +750,16 @@ class MSRBenchCircular(MSRBenchDataset):
         # 提取前统计缓存文件数量
         cache_files_before = len(glob.glob(os.path.join(cache_dir, "choice_cache_*.json")))
         
-        data['extracted_pred'] = MSRBenchDataset.batch_extract_choices_with_llm(
+        
+        data['extracted_pred'] = MMSIBenchDataset.batch_extract_choices_with_llm(
             data.to_dict('records'), 
             num_processes=num_processes,
             cache_dir=cache_dir,
             use_single_thread=use_single_thread
         )
         
-        
         # extracted_pred_exactmatch
-        # data['extracted_pred'] = data['prediction'].apply(MSRBenchDataset.extract_single_choice_with_word_boundary)
-        # import ipdb; ipdb.set_trace()
+        data['extracted_pred'] = data['prediction'].apply(MMSIBenchDataset.extract_single_choice_with_word_boundary)
         
         # 提取后统计缓存文件数量
         cache_files_after = len(glob.glob(os.path.join(cache_dir, "choice_cache_*.json")))
@@ -912,7 +907,7 @@ class MSRBenchCircular(MSRBenchDataset):
         combined_df.to_csv(score_file)
         
         # 输出最终结果
-        print(f"\n====== MSR_Bench 评测结果 ======")
+        print(f"\n====== MMSI_Bench 评测结果 ======")
         print(f"总样本组数: {len(circular_df)}")
         
         print(f"\n📊 传统评估 (Vanilla) - 单题正确率: {vanilla_acc['Overall']:.2%}")

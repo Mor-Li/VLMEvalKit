@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# compare_msr_bench_fixed.py - Fixed version for model comparison
+# compare_MMSI_bench_fixed.py - Fixed version for model comparison
 import os
 import argparse
 import pandas as pd
@@ -7,12 +7,12 @@ import gradio as gr
 import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
-from vlmeval.dataset.mmsi_bench import MSRBenchDataset
+from vlmeval.dataset.mmsi_bench import MMSIBenchDataset
 
-class MSRBenchComparer:
+class MMSIBenchComparer:
     def __init__(self, model_names):
         self.model_names = model_names
-        self.dataset = MSRBenchDataset(dataset='MSR_Bench')
+        self.dataset = MMSIBenchDataset(dataset='MMSI_Bench')
         self.models_data = {}
         self.load_model_results()
         self.indices = []
@@ -20,7 +20,7 @@ class MSRBenchComparer:
     def load_model_results(self):
         """Load all model results"""
         for model in self.model_names:
-            file_path = f'outputs/{model}/{model}_MSR_Bench_score.xlsx'
+            file_path = f'outputs/{model}/{model}_MMSI_Bench_score.xlsx'
             if os.path.exists(file_path):
                 self.models_data[model] = pd.read_excel(file_path)
                 print(f"Loaded {model} data: {len(self.models_data[model])} entries")
@@ -57,8 +57,8 @@ class MSRBenchComparer:
     
     def create_ui(self):
         """Create Gradio interface"""
-        with gr.Blocks(title="MSR Bench Model Comparison") as ui:
-            gr.Markdown("## MSR Bench Model Comparison")
+        with gr.Blocks(title="MMSI Bench Model Comparison") as ui:
+            gr.Markdown("## MMSI Bench Model Comparison")
             
             with gr.Row():
                 with gr.Column(scale=1):
@@ -303,7 +303,7 @@ class MSRBenchComparer:
         return stats_text
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Compare model predictions on MSR_Bench")
+    parser = argparse.ArgumentParser(description="Compare model predictions on MMSI_Bench")
     parser.add_argument("--models", type=str, nargs="+", required=True, 
                         help="List of model names to compare")
     args = parser.parse_args()
@@ -311,6 +311,6 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    comparer = MSRBenchComparer(args.models)
+    comparer = MMSIBenchComparer(args.models)
     ui = comparer.create_ui()
     ui.launch(share=True, server_port=7868) 

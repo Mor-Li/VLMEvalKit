@@ -13,7 +13,7 @@ def get_score(model, dataset):
         'AI2D_TEST', 'MMStar', 'RealWorldQA', 'BLINK', 'VisOnlyQA-VLMEvalKit'
     ], dataset):
         file_name += '_acc.csv'
-    elif dataset == 'MSR_Bench_Circular':
+    elif dataset == 'MMSI_Bench_Circular':
         file_name += '_combined_acc.csv'  # 使用新的 combined_acc.csv 文件
     elif listinstr(['MME', 'Hallusion', 'LLaVABench'], dataset):
         file_name += '_score.csv'
@@ -23,7 +23,7 @@ def get_score(model, dataset):
         file_name += '_score.json'
     elif listinstr(['Spatial457'], dataset):
         file_name += '_score.json'
-    elif listinstr(['MSR_Bench'], dataset):
+    elif listinstr(['MMSI_Bench'], dataset):
         file_name += '_score.xlsx'
     else:
         raise NotImplementedError
@@ -77,27 +77,27 @@ def get_score(model, dataset):
         for level in ["L1_single", "L2_objects", "L3_2d_spatial", "L4_occ",
                         "L4_pose", "L5_6d_spatial", "L5_collision"]:
             ret[f"{dataset} - {level}"] = data[f"{level}_score"] * 100
-    elif dataset == 'MSR_Bench_Circular':
+    elif dataset == 'MMSI_Bench_Circular':
         # 简化处理 - 直接读取 combined_acc.csv 文件
         data = pd.read_csv(file_name, index_col=0)
         
         # 获取总体结果
-        ret['MSR_Bench (Vanilla)'] = data.loc['Overall', 'Vanilla'] * 100
-        ret['MSR_Bench (Circular)'] = data.loc['Overall', 'Circular'] * 100
+        ret['MMSI_Bench (Vanilla)'] = data.loc['Overall', 'Vanilla'] * 100
+        ret['MMSI_Bench (Circular)'] = data.loc['Overall', 'Circular'] * 100
         
         # 获取类别结果 - 先添加Vanilla结果，然后添加Circular结果
         for idx in data.index:
             if idx == 'Overall':
                 continue
             category = idx
-            ret[f'MSR_Bench (Vanilla) - {category}'] = data.loc[category, 'Vanilla'] * 100
+            ret[f'MMSI_Bench (Vanilla) - {category}'] = data.loc[category, 'Vanilla'] * 100
         
         for idx in data.index:
             if idx == 'Overall':
                 continue
             category = idx
-            ret[f'MSR_Bench (Circular) - {category}'] = data.loc[category, 'Circular'] * 100
-    elif dataset == 'MSR_Bench':
+            ret[f'MMSI_Bench (Circular) - {category}'] = data.loc[category, 'Circular'] * 100
+    elif dataset == 'MMSI_Bench':
         # Calculate overall accuracy from the score column (0 or 1 for each question)
         if 'score' in data.columns:
             # Overall accuracy is the mean of all scores
@@ -120,7 +120,7 @@ def get_category_counts(model, dataset):
     """
     从原始数据文件中获取各个类别的样本数量
     """
-    if dataset != 'MSR_Bench_Circular':
+    if dataset != 'MMSI_Bench_Circular':
         return {}
     
     # 尝试从原始文件获取类别样本数量
@@ -138,7 +138,7 @@ def get_category_counts(model, dataset):
             file_path = f'outputs/{model}/{model}_{dataset}.xlsx'
             if osp.exists(file_path):
                 data = load(file_path)
-                # 对于 MSR_Bench_Circular，需要先处理 g_index
+                # 对于 MMSI_Bench_Circular，需要先处理 g_index
                 if 'g_index' in data.columns and 'category' in data.columns:
                     # 按 g_index 分组，只统计每个组中的第一个样本
                     unique_samples = data.drop_duplicates(subset=['g_index'])
@@ -175,13 +175,13 @@ def gen_table(models, datasets):
     
     # 对keys进行排序，使得相关条目分组显示：先显示总体结果，然后是Vanilla细分结果，最后是Circular细分结果
     def sort_key(item):
-        if "MSR_Bench (Vanilla)" == item:
+        if "MMSI_Bench (Vanilla)" == item:
             return (0, 0)  # 总体Vanilla结果排在最前面
-        elif "MSR_Bench (Circular)" == item:
+        elif "MMSI_Bench (Circular)" == item:
             return (0, 1)  # 总体Circular结果排第二
-        elif "MSR_Bench (Vanilla) -" in item:
+        elif "MMSI_Bench (Vanilla) -" in item:
             return (1, item)  # Vanilla细分结果排在中间
-        elif "MSR_Bench (Circular) -" in item:
+        elif "MMSI_Bench (Circular) -" in item:
             return (2, item)  # Circular细分结果排在最后
         else:
             return (3, item)  # 其他结果

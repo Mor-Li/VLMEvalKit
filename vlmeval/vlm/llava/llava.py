@@ -587,8 +587,8 @@ class LLaVA_OneVision(BaseModel):
                     content += self.DEFAULT_IMAGE_TOKEN + "\n"
                 else:
                     content += self.DEFAULT_IMAGE_TOKEN + " "
-        
-        
+
+
         # Process images using the class attribute self.process_images
         image_tensor = self.process_images(
             images, self.image_processor, self.model.config

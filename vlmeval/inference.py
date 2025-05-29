@@ -226,7 +226,7 @@ def infer_data_job(
             error_msg = f"After {max_retries} retries, still missing {len(missing_indices)} indices: {missing_str}"
             print(f"[Rank 0] ERROR: {error_msg}")
             assert False, error_msg
-        
+
         data['prediction'] = [str(data_all[x]) for x in data['index']]
         if 'image' in data:
             data.pop('image')

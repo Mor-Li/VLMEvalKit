@@ -212,7 +212,8 @@ def infer_data_job(
 
             # If not the last attempt, wait and retry
             if retry_count < max_retries - 1:
-                print(f"[Rank 0] Missing {len(missing_indices)} indices in combined results. Waiting 60 seconds and retrying... (Attempt {retry_count+1}/{max_retries})")
+                print(f"[Rank 0] Missing {len(missing_indices)} indices in combined results. "
+                      f"Waiting 60 seconds and retrying... (Attempt {retry_count + 1}/{max_retries})")
                 print(f"[Rank 0] Missing indices: {missing_indices[:10]}{'...' if len(missing_indices) > 10 else ''}")
                 time.sleep(60)  # Wait for 60 seconds
 

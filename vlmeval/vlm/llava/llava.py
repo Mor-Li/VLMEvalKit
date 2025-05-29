@@ -583,11 +583,10 @@ class LLaVA_OneVision(BaseModel):
                 images.append(img)
                 image_sizes.append(img.size)  # Store the size of each image
                 # image和image之间加空格，最后一个image后面直接回车
-                if idx == len(message) - 1 or all(m["type"] == "text" for m in message[idx+1:]):
+                if idx == len(message) - 1 or all(m["type"] == "text" for m in message[idx + 1:]):
                     content += self.DEFAULT_IMAGE_TOKEN + "\n"
                 else:
                     content += self.DEFAULT_IMAGE_TOKEN + " "
-
 
         # Process images using the class attribute self.process_images
         image_tensor = self.process_images(

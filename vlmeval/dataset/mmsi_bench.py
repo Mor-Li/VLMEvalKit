@@ -8,9 +8,11 @@ import warnings
 from tqdm import tqdm
 from .image_mcq import ImageMCQDataset
 from .utils import DEBUG_MESSAGE, build_judge
-from ..smp import LMUDataRoot, file_size, load, dump, decode_base64_to_image_file, listinstr, gpt_key_set
+from ..smp import (LMUDataRoot, file_size, load, dump, decode_base64_to_image_file,
+                   listinstr, gpt_key_set)
 import string
 import glob
+
 
 class MMSIBenchDataset(ImageMCQDataset):
     """
@@ -49,7 +51,8 @@ class MMSIBenchDataset(ImageMCQDataset):
             if isinstance(img_field, (pd.Series, np.ndarray)):
                 # 如果是Series或数组，取第一个元素
                 if len(img_field) > 0:
-                    img_str = img_field.iloc[0] if hasattr(img_field, 'iloc') else img_field[0]
+                    img_str = (img_field.iloc[0] if hasattr(img_field, 'iloc')
+                              else img_field[0])
                 else:
                     return None
             else:
@@ -108,7 +111,8 @@ class MMSIBenchDataset(ImageMCQDataset):
         # 构建文本提示 - 在新格式中，question字段已经包含了选项，不需要再拼接
         question = line['question']
         # 添加post_prompt，引导模型以正确格式回答
-        post_prompt = "Answer with the option's letter from the given choices directly. Enclose the option's letter within ``."
+        post_prompt = ("Answer with the option's letter from the given choices directly. "
+                      "Enclose the option's letter within ``.")
         prompt = f'{question}\n{post_prompt}'
 
         # 构建多模态消息
@@ -130,7 +134,6 @@ class MMSIBenchDataset(ImageMCQDataset):
         评估模型预测结果。
         使用extract_single_choice_with_word_boundary函数提取预测的选项。
         """
-        from ..smp.file import load
         data = load(eval_file)
 
         # 确保预测值和答案都是字符串类型
@@ -172,7 +175,7 @@ class MMSIBenchDataset(ImageMCQDataset):
                     elif predict[0:14] == "the answer is " and answer == predict[14]:
                         data.at[idx, 'score'] = 1.0
                         correct += 1
-                except Exception as e:
+                except Exception:
                     pass
 
             total += 1
@@ -216,7 +219,7 @@ class MMSIBenchDataset(ImageMCQDataset):
         # 确保pred是字符串类型
         try:
             pred = str(pred)
-        except:
+        except Exception:
             return None
 
         pattern_1 = r'``([^`]*)``'
@@ -256,7 +259,6 @@ class MMSIBenchDataset(ImageMCQDataset):
         import os
         import json
         from concurrent.futures import ProcessPoolExecutor
-        from .utils import build_judge
 
         # Setup cache directory
         if cache_dir is None:
@@ -278,7 +280,7 @@ class MMSIBenchDataset(ImageMCQDataset):
                 with open(cache_path, 'r') as f:
                     cached_data = json.load(f)
                     return cached_data.get('choice', 'Z')
-            except:
+            except Exception:
                 # If there's any error with the cache, proceed without it
                 pass
 
@@ -331,12 +333,12 @@ class MMSIBenchDataset(ImageMCQDataset):
                                 'full_response': ans,
                                 'prompt': prompt
                             }, f)
-                    except:
+                    except Exception:
                         # If caching fails, just continue
                         pass
 
                     return choice
-            except:
+            except Exception:
                 pass
 
             retry -= 1
@@ -350,7 +352,7 @@ class MMSIBenchDataset(ImageMCQDataset):
                     'full_response': 'Failed to extract',
                     'prompt': prompt
                 }, f)
-        except:
+        except Exception:
             pass
 
         return "Z"
@@ -493,7 +495,8 @@ class MMSIBenchDataset(ImageMCQDataset):
             return "Z"  # 出错时返回默认值
 
     @staticmethod
-    def batch_extract_choices_with_llm(data_rows, num_processes=32, cache_dir='.cache', use_single_thread=False):
+    def batch_extract_choices_with_llm(data_rows, num_processes=32, cache_dir='.cache',
+                                      use_single_thread=False):
         """
         并发处理多个预测
 
@@ -534,10 +537,11 @@ class MMSIBenchDataset(ImageMCQDataset):
             for i, row in enumerate(row_dicts):
                 result = MMSIBenchDataset._process_single_item(row, cache_dir=cache_dir)
                 results.append(result)
-                if (i+1) % max(1, total//20) == 0:
+                if (i + 1) % max(1, total // 20) == 0:
                     elapsed = time.time() - start_time
-                    remaining = (elapsed / (i+1)) * (total - (i+1))
-                    print(f"单线程进度: {i+1}/{total} ({(i+1)/total*100:.1f}%) - 已用时: {elapsed:.1f}秒, 剩余时间: {remaining:.1f}秒")
+                    remaining = (elapsed / (i + 1)) * (total - (i + 1))
+                    print(f"单线程进度: {i + 1}/{total} ({(i + 1) / total * 100:.1f}%) - "
+                          f"已用时: {elapsed:.1f}秒, 剩余时间: {remaining:.1f}秒")
             return results
 
         # 创建进程共享的处理函数
@@ -571,11 +575,12 @@ class MMSIBenchDataset(ImageMCQDataset):
                 print("使用标准进程池")
 
             # 使用 imap 可以按顺序得到结果，同时支持并行处理
-            for i, result in enumerate(pool.imap(process_func, row_dicts, chunksize=max(1, total // (num_processes * 4)))):
+            chunksize = max(1, total // (num_processes * 4))
+            for i, result in enumerate(pool.imap(process_func, row_dicts, chunksize=chunksize)):
                 results.append(result)
                 processed = i + 1
-                if processed % max(1, total//20) == 0:  # 每5%更新一次进度
-                    print(f"进度: {processed}/{total} ({processed/total*100:.1f}%)")
+                if processed % max(1, total // 20) == 0:  # 每5%更新一次进度
+                    print(f"进度: {processed}/{total} ({processed / total * 100:.1f}%)")
 
             pool.close()
             pool.join()
@@ -588,11 +593,12 @@ class MMSIBenchDataset(ImageMCQDataset):
             for i, row in enumerate(row_dicts):
                 result = MMSIBenchDataset._process_single_item(row, cache_dir=cache_dir)
                 results.append(result)
-                if (i+1) % max(1, total//20) == 0:
-                    print(f"单线程进度: {i+1}/{total} ({(i+1)/total*100:.1f}%)")
+                if (i + 1) % max(1, total // 20) == 0:
+                    print(f"单线程进度: {i + 1}/{total} ({(i + 1) / total * 100:.1f}%)")
 
         print(f"完成所有处理: {len(results)}/{total}")
         return results
+
 
 class MMSIBenchCircular(MMSIBenchDataset):
     """
@@ -682,7 +688,8 @@ class MMSIBenchCircular(MMSIBenchDataset):
         else:
             return super(MMSIBenchCircular, self).load_data(dataset)
 
-    def evaluate(self, eval_file, cache_dir='.cache', num_processes=32, use_single_thread=False, **judge_kwargs):
+    def evaluate(self, eval_file, cache_dir='.cache', num_processes=32, use_single_thread=False,
+                **judge_kwargs):
         """
         评估方法，同时计算循环评估和传统评估的结果
 
@@ -693,19 +700,17 @@ class MMSIBenchCircular(MMSIBenchDataset):
             use_single_thread: 是否使用单线程处理
             **judge_kwargs: 其他参数
         """
-        from ..smp.file import load, dump
         from .utils.multiple_choice import report_acc
         import pandas as pd
         import numpy as np
         import os
-        import glob
 
         # 确保缓存目录存在
         os.makedirs(cache_dir, exist_ok=True)
 
         # 检查缓存目录中已有的缓存文件数量
         cache_files = glob.glob(os.path.join(cache_dir, "choice_cache_*.json"))
-        print(f"❗ 缓存目录 '{cache_dir}' 中已有 {len(cache_files)} 个缓存文件")
+        print(f"缓存目录 '{cache_dir}' 中已有 {len(cache_files)} 个缓存文件")
 
         suffix = eval_file.split('.')[-1]
 
@@ -720,12 +725,11 @@ class MMSIBenchCircular(MMSIBenchDataset):
             data['g_index'] = [int(x % 1e6) for x in data['index']]
 
         # 使用LLM提取选项，通过并发处理提高速度
-        print(f"❗ 使用 {num_processes} 个并行进程提取选项，缓存目录：{cache_dir}")
-        print(f"❗ {'使用单线程模式' if use_single_thread else '使用多进程模式'}")
+        print(f"使用 {num_processes} 个并行进程提取选项，缓存目录：{cache_dir}")
+        print(f"{'使用单线程模式' if use_single_thread else '使用多进程模式'}")
 
         # 提取前统计缓存文件数量
         cache_files_before = len(glob.glob(os.path.join(cache_dir, "choice_cache_*.json")))
-
 
         data['extracted_pred'] = MMSIBenchDataset.batch_extract_choices_with_llm(
             data.to_dict('records'),
@@ -735,17 +739,18 @@ class MMSIBenchCircular(MMSIBenchDataset):
         )
 
         # extracted_pred_exactmatch
-        data['extracted_pred'] = data['prediction'].apply(MMSIBenchDataset.extract_single_choice_with_word_boundary)
+        data['extracted_pred'] = data['prediction'].apply(
+            MMSIBenchDataset.extract_single_choice_with_word_boundary)
 
         # 提取后统计缓存文件数量
         cache_files_after = len(glob.glob(os.path.join(cache_dir, "choice_cache_*.json")))
         new_cache_files = cache_files_after - cache_files_before
 
-        print(f"❗ 已完成 {len(data)} 个样本的选项提取")
-        print(f"❗ 新增 {new_cache_files} 个缓存文件，共有 {cache_files_after} 个缓存文件")
+        print(f"已完成 {len(data)} 个样本的选项提取")
+        print(f"新增 {new_cache_files} 个缓存文件，共有 {cache_files_after} 个缓存文件")
 
         # ----- 循环评估 (Circular Evaluation) -----
-        print(f"🔄 开始计算循环评估 (Circular Evaluation) 结果...")
+        print("🔄 开始计算循环评估 (Circular Evaluation) 结果...")
 
         # 分组评估
         groups = data.groupby('g_index')
@@ -788,7 +793,7 @@ class MMSIBenchCircular(MMSIBenchDataset):
         circular_df = pd.DataFrame(circular_results)
 
         # ----- 传统评估 (Vanilla Evaluation) -----
-        print(f"🔍 开始计算传统评估 (Vanilla Evaluation) 结果...")
+        print("🔍 开始计算传统评估 (Vanilla Evaluation) 结果...")
 
         # 创建传统评估的结果列表
         vanilla_results = []
@@ -808,7 +813,8 @@ class MMSIBenchCircular(MMSIBenchDataset):
                 'prediction': original_row['prediction'],
                 'extracted_pred': original_row['extracted_pred'],
                 'hit': 1 if original_row['extracted_pred'] == original_row['answer'] else 0,
-                'log': f"Index {original_row['index']}: 预测={original_row['extracted_pred']}, 答案={original_row['answer']}"
+                'log': (f"Index {original_row['index']}: 预测={original_row['extracted_pred']}, "
+                       f"答案={original_row['answer']}")
             }
 
             vanilla_results.append(result_row)
@@ -883,13 +889,13 @@ class MMSIBenchCircular(MMSIBenchDataset):
         combined_df.to_csv(score_file)
 
         # 输出最终结果
-        print(f"\n====== MMSI_Bench 评测结果 ======")
+        print("\n====== MMSI_Bench 评测结果 ======")
         print(f"总样本组数: {len(circular_df)}")
 
         print(f"\n📊 传统评估 (Vanilla) - 单题正确率: {vanilla_acc['Overall']:.2%}")
         print(f"📊 循环评估 (Circular) - 全题组正确率: {circular_acc['Overall']:.2%}")
 
-        print(f"\n📊 各类别准确率:")
+        print("\n📊 各类别准确率:")
         for cat in categories:
             print(f"{cat}:")
             print(f"  传统评估: {vanilla_acc[cat]:.2%}")

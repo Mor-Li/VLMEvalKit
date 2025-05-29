@@ -730,18 +730,23 @@ class MMSIBenchCircular(MMSIBenchDataset):
 
         # 提取前统计缓存文件数量
         cache_files_before = len(glob.glob(os.path.join(cache_dir, "choice_cache_*.json")))
+        
+        # 这里可以切换用哪种方式来提取答案
+        # 对于大多数model，我们用的是 extract_single_choice_with_word_boundary
+        # 对于 Claude3-7V_Sonnet、Llama-3.2-11B-Vision-Instruct、doubao-1-5-thinking-vision-pro-250428
+        # 我们用的是 LLM 来提取答案（batch_extract_choices_with_llm）
+        # 通过注释/取消注释下面的两行来切换
 
-        data['extracted_pred'] = MMSIBenchDataset.batch_extract_choices_with_llm(
-            data.to_dict('records'),
-            num_processes=num_processes,
-            cache_dir=cache_dir,
-            use_single_thread=use_single_thread
-        )
+        # --- 用 LLM 提取答案（适用于部分模型，见上注释）---
+        # data['extracted_pred'] = MMSIBenchDataset.batch_extract_choices_with_llm(
+        #     data.to_dict('records'), 
+        #     num_processes=num_processes,
+        #     cache_dir=cache_dir,
+        #     use_single_thread=use_single_thread
+        # )
 
-        # extracted_pred_exactmatch
-        data['extracted_pred'] = data['prediction'].apply(
-            MMSIBenchDataset.extract_single_choice_with_word_boundary)
-
+        # --- 用正则精确匹配提取答案（大多数模型用这个）---
+        data['extracted_pred'] = data['prediction'].apply(MMSIBenchDataset.extract_single_choice_with_word_boundary)
         # 提取后统计缓存文件数量
         cache_files_after = len(glob.glob(os.path.join(cache_dir, "choice_cache_*.json")))
         new_cache_files = cache_files_after - cache_files_before

@@ -19,37 +19,16 @@ class MMSIBenchDataset(ImageMCQDataset):
     """
     TYPE = 'MCQ'
     
-    MMSI_BENCH_TSV = '/fs-computility/mllm1/shared/LMUData/MMSI_bench_fanal_version_5_5_cat_option_to_qs_fixed.tsv'
-
-    # DATASET_URL = {
-    #     'MMSI_Bench': 'file:///fs-computility/mllm1/shared/LMUData/MMSI_bench_cat_option_to_qs.tsv'
-    # }
+    DATASET_URL = {
+        'MMSI_Bench': 'https://huggingface.co/datasets/RunsenXu/MMSI-Bench/resolve/main/MMSI_bench.tsv'
+    }
     DATASET_MD5 = {
-        'MMSI_Bench': ''  # 如果有MD5校验，可以在这里添加
+        'MMSI_Bench': 'c473f72a345f616fa68a628580b573b6'  
     }
     
     @classmethod
     def supported_datasets(cls):
         return ['MMSI_Bench']
-    
-    def load_data(self, dataset):
-        """
-        重写load_data方法，直接加载本地TSV文件
-        """
-        if dataset == 'MMSI_Bench':
-            tsv_path = self.__class__.MMSI_BENCH_TSV
-            if not osp.exists(tsv_path):
-                raise FileNotFoundError(f"MMSI_Bench TSV文件不存在: {tsv_path}")
-            
-            data = pd.read_csv(tsv_path, sep='\t')
-            # 确保必要的列存在
-            assert 'index' in data.columns, "TSV文件缺少'index'列"
-            assert 'question' in data.columns, "TSV文件缺少'question'列"
-            
-            return data
-        else:
-            # 对于其他数据集，使用父类的方法
-            return super().load_data(dataset)
     
     def dump_image(self, line):
         """
@@ -658,11 +637,8 @@ class MMSIBenchCircular(MMSIBenchDataset):
         加载数据并自动生成 circular 变体，每题4种选项顺序。
         """
         if dataset == 'MMSI_Bench_Circular':
-            tsv_path = MMSIBenchDataset.MMSI_BENCH_TSV
-            if not osp.exists(tsv_path):
-                raise FileNotFoundError(f"MMSI_Bench TSV文件不存在: {tsv_path}")
-
-            data = pd.read_csv(tsv_path, sep='\t')
+            # 使用父类的网络下载方法加载MMSI_Bench数据
+            data = super(MMSIBenchCircular, self).load_data('MMSI_Bench')
             assert 'index' in data.columns, "TSV文件缺少'index'列"
             assert 'question' in data.columns, "TSV文件缺少'question'列"
 

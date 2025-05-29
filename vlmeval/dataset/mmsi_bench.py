@@ -52,7 +52,7 @@ class MMSIBenchDataset(ImageMCQDataset):
                 # 如果是Series或数组，取第一个元素
                 if len(img_field) > 0:
                     img_str = (img_field.iloc[0] if hasattr(img_field, 'iloc')
-                              else img_field[0])
+                               else img_field[0])
                 else:
                     return None
             else:
@@ -112,7 +112,7 @@ class MMSIBenchDataset(ImageMCQDataset):
         question = line['question']
         # 添加post_prompt，引导模型以正确格式回答
         post_prompt = ("Answer with the option's letter from the given choices directly. "
-                      "Enclose the option's letter within ``.")
+                       "Enclose the option's letter within ``.")
         prompt = f'{question}\n{post_prompt}'
 
         # 构建多模态消息
@@ -496,7 +496,7 @@ class MMSIBenchDataset(ImageMCQDataset):
 
     @staticmethod
     def batch_extract_choices_with_llm(data_rows, num_processes=32, cache_dir='.cache',
-                                      use_single_thread=False):
+                                       use_single_thread=False):
         """
         并发处理多个预测
 
@@ -689,7 +689,7 @@ class MMSIBenchCircular(MMSIBenchDataset):
             return super(MMSIBenchCircular, self).load_data(dataset)
 
     def evaluate(self, eval_file, cache_dir='.cache', num_processes=32, use_single_thread=False,
-                **judge_kwargs):
+                 **judge_kwargs):
         """
         评估方法，同时计算循环评估和传统评估的结果
 
@@ -726,7 +726,7 @@ class MMSIBenchCircular(MMSIBenchDataset):
 
         # 使用LLM提取选项，通过并发处理提高速度
         print(f"使用 {num_processes} 个并行进程提取选项，缓存目录：{cache_dir}")
-        print(f"{'使用单线程模式' if use_single_thread else '使用多进程模式'}")
+        print("使用单线程模式" if use_single_thread else "使用多进程模式")
 
         # 提取前统计缓存文件数量
         cache_files_before = len(glob.glob(os.path.join(cache_dir, "choice_cache_*.json")))
@@ -814,7 +814,7 @@ class MMSIBenchCircular(MMSIBenchDataset):
                 'extracted_pred': original_row['extracted_pred'],
                 'hit': 1 if original_row['extracted_pred'] == original_row['answer'] else 0,
                 'log': (f"Index {original_row['index']}: 预测={original_row['extracted_pred']}, "
-                       f"答案={original_row['answer']}")
+                        f"答案={original_row['answer']}")
             }
 
             vanilla_results.append(result_row)
@@ -879,12 +879,12 @@ class MMSIBenchCircular(MMSIBenchDataset):
             combined_df = combined_df.drop('Overall')
             # 使用 pd.concat 将 Overall 行添加到 DataFrame 的开头
             combined_df = pd.concat([pd.DataFrame({'Circular': [overall_data['Circular']],
-                                                  'Vanilla': [overall_data['Vanilla']]},
-                                               index=['Overall']),
-                                  combined_df])
+                                                   'Vanilla': [overall_data['Vanilla']]},
+                                                  index=['Overall']),
+                                     combined_df])
 
         # 保存准确率结果
-        score_file = eval_file.replace(f'.{suffix}', f'_combined_acc.csv')
+        score_file = eval_file.replace(f'.{suffix}', '_combined_acc.csv')
         # 确保保存的CSV文件包含行索引
         combined_df.to_csv(score_file)
 
